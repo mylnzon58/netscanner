@@ -104,6 +104,8 @@ if ($running) {
 SOCKSPort $SocksPort
 DataDirectory $DataDir
 Log notice file $LogFile
+GeoIPFile $DataDir\geoip
+GeoIPv6File $DataDir\geoip6
 ExitNodes {ar}
 StrictNodes 0
 "@ | Set-Content -Path $Torrc -Encoding ASCII
