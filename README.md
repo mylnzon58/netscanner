@@ -61,7 +61,7 @@ netscanner.exe -c 10.0.0.0/8 -p 80,443,8080,554,21 -w 1000 -t 1500 -o out.jsonl
 .\anon.ps1
 
 # a partir de acá todas las conexiones salen por Tor
-.\netscanner.exe -c 203.0.113.0/22 -p 80,443,554 -w 20 -t 5000 -o anon.jsonl --proxy socks5://127.0.0.1:9050
+.\netscanner.exe -c 203.0.113.0/24 -p 80,443,554 -w 20 -t 5000 -o anon.jsonl --proxy socks5://127.0.0.1:9050
 ```
 
 El dashboard puede usar el mismo proxy para el navegador en vivo y el listado FTP: `.\dashboard.exe -file anon.jsonl --proxy socks5://127.0.0.1:9050`.
@@ -135,6 +135,10 @@ pkg/live/       hub SSE + tailer de archivo para el dashboard
 ```
 
 La especificación técnica completa está en `SPEC.md`.
+
+## Autor
+
+Código y diseño por **Juanjoclassic** ([TikTok](https://www.tiktok.com/@juanjoclassic)). Licencia [MIT](LICENSE).
 
 ## Descargo de responsabilidad
 

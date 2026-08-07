@@ -68,7 +68,7 @@ El panel tiene una sección **🔬 Laboratorio**: escribís una IP o un dominio 
 2. **ISP y ciudad** (ip-api.com).
 3. **Puertos y servicios públicos** indexados por **Shodan InternetDB** (lo que el mundo ya sabe de esa IP, sin tocar nada → 100% legal).
 
-Para escanear un rango de otro operador de tu zona necesitás sus bloques de IP. Se obtienen con `whois` (ej: `whois 201.234.0.0`), o buscando el ASN del operador. ⚠️ **Escanear redes de terceros sin autorización es un delito en Argentina** (acceso ilegítimo a sistemas). Hacelo solo en tu red, la de tu trabajo (con permiso) o con el dueño de la red de acuerdo.
+Para escanear un rango de otro operador de tu zona necesitás sus bloques de IP. Se obtienen con `whois` (ej: `whois 203.0.113.0`), o buscando el ASN del operador. ⚠️ **Escanear redes de terceros sin autorización es un delito en Argentina** (acceso ilegítimo a sistemas). Hacelo solo en tu red, la de tu trabajo (con permiso) o con el dueño de la red de acuerdo.
 
 ## 6. Mapa
 
@@ -80,8 +80,8 @@ Para escanear un rango de otro operador de tu zona necesitás sus bloques de IP.
 | Tarea | Comando |
 |---|---|
 | Tu red local | `.\netscanner.exe -c 192.168.1.0/24 -o casa.jsonl` |
-| Una IP suelta | `.\netscanner.exe -c 45.226.10.2/32 -p 80,443,554,21 -o ip.jsonl` |
-| Un rango de ISP (conocido/tuyo) | `.\netscanner.exe -c 198.51.100.0/21 -p 80,443,8080,8000,554,21,22,5000,5001 -w 400 -t 1500 -o isp.jsonl --stats scan_stats.json` |
+| Una IP suelta | `.\netscanner.exe -c 203.0.113.7/32 -p 80,443,554,21 -o ip.jsonl` |
+| Un rango de ISP (conocido/tuyo) | `.\netscanner.exe -c 198.51.100.0/24 -p 80,443,8080,8000,554,21,22,5000,5001 -w 400 -t 1500 -o isp.jsonl --stats scan_stats.json` |
 | Anónimo por TOR | agregar `--proxy socks5://127.0.0.1:9050` (y bajar `-w` a 20-50) |
 | Ver resultados | `.\dashboard.exe -file isp.jsonl` → http://127.0.0.1:8080 |
 | Geolocalizar | `.\enrich.exe -in isp.jsonl` (genera `isp_geo.jsonl`) |
