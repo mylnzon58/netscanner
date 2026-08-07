@@ -92,11 +92,9 @@ func Parse(args []string) (*Options, error) {
 }
 
 func (o *Options) validate() error {
-	_, ipnet, err := net.ParseCIDR(o.CIDR)
-	if err != nil {
-		return fmt.Errorf("--cidr inválido %q: %w", o.CIDR, err)
-	}
-	if ipnet.IP.To4() == nil {
+	// El CIDR puede ser una red, una IP suelta o un hostname (que el
+	// main resuelve antes de escanear); los tres llegan por --cidr.
+	if _, ipnet, err := net.ParseCIDR(o.CIDR); err == nil && ipnet.IP.To4() == nil {
 		return fmt.Errorf("--cidr inválido %q: solo se soportan redes IPv4", o.CIDR)
 	}
 

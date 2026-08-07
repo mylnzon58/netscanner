@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,12 +22,45 @@ import (
 	"netscanner/pkg/socks"
 )
 
+// resolveTarget convierte un hostname (o URL) en un CIDR /32 con la
+// primera IPv4 que resuelva. Si la spec ya es un CIDR válido, no toca nada.
+func resolveTarget(opts *config.Options) error {
+	if _, _, err := net.ParseCIDR(opts.CIDR); err == nil {
+		return nil
+	}
+	host := strings.TrimSpace(opts.CIDR)
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.TrimPrefix(host, "https://")
+	if i := strings.IndexByte(host, '/'); i >= 0 {
+		host = host[:i]
+	}
+	if net.ParseIP(host) != nil {
+		opts.CIDR = host + "/32"
+		return nil
+	}
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("no se pudo resolver %q: %w", opts.CIDR, err)
+	}
+	for _, ip := range ips {
+		if ip4 := net.ParseIP(ip).To4(); ip4 != nil {
+			opts.CIDR = ip4.String() + "/32"
+			return nil
+		}
+	}
+	return fmt.Errorf("%q no resuelve a ninguna IPv4", opts.CIDR)
+}
+
 func main() {
 	opts, err := config.Parse(os.Args[1:])
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			os.Exit(0)
 		}
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(2)
+	}
+	if err := resolveTarget(opts); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(2)
 	}

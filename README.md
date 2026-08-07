@@ -37,11 +37,14 @@ También hay un Makefile: `make build` / `make test` / `make clean`.
 ```powershell
 netscanner.exe -c 192.168.1.0/24
 netscanner.exe -c 10.0.0.0/8 -p 80,443,8080,554,21 -w 1000 -t 1500 -o out.jsonl
+netscanner.exe -c delco-digital.com -p 80,443,8080 -o web.jsonl
 ```
+
+`-c` acepta un rango CIDR, una IP suelta (`203.0.113.7`) o un dominio (se resuelve por DNS y se escanea esa IP).
 
 | Flag | Corto | Por defecto | Descripción |
 |---|---|---|---|
-| `--cidr` | `-c` | `192.168.1.0/24` | rango IPv4 a escanear |
+| `--cidr` | `-c` | `192.168.1.0/24` | rango IPv4, IP suelta o dominio a escanear |
 | `--ports` | `-p` | `80,443,8080,8000,554,21,22` | puertos TCP separados por coma |
 | `--ftp-ports` | | `21` | puertos que reciben el sondeo FTP anónimo |
 | `--dav` | | `true` | sondear puertos web con PROPFIND para detectar WebDAV |

@@ -77,7 +77,6 @@ func TestParseLongFlags(t *testing.T) {
 
 func TestParseInvalid(t *testing.T) {
 	cases := [][]string{
-		{"-c", "not-a-cidr"},
 		{"-c", "2001:db8::/64"},
 		{"-p", "99999"},
 		{"-p", "abc"},
