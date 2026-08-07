@@ -92,7 +92,11 @@ Abrís `http://127.0.0.1:8080`. El panel:
 - **previsualiza automáticamente**: capturas de cámaras (`/snapshot.cgi`, `/image.jpg`, …), miniaturas de imágenes en listados expuestos y un botón para **listar directorios FTP anónimos** en vivo;
 - ofrece un **navegador en vivo** (`/proxy`) para recorrer cualquier host descubierto dentro del panel;
 - calcula un **puntaje de riesgo de exposición** por dispositivo (listados de archivos, cámaras, logins, FTP, WebDAV, puertos abiertos) con badges alto/medio/bajo;
-- incluye la **consola de laboratorio** para consultar DNS, ISP y Shodan de cualquier IP o dominio (sin escanear).
+- incluye la **consola de laboratorio** para consultar DNS, ISP y Shodan de cualquier IP o dominio (sin escanear);
+- **escanea desde la web**: cuando no hay datos, el panel propone objetivos (tu red local, tu IP pública o un dominio) y un formulario para lanzar el escaneo con puertos, timeout, workers y proxy opcional, viendo el progreso en vivo;
+- muestra **tecnologías y CDN** detectadas (jQuery, nginx, Cloudflare, WordPress, …) como etiquetas en cada ficha;
+- deja **notas por dispositivo** (por ejemplo, "es un honeypot, no tocar") guardadas en `comments.json`;
+- analiza cada dispositivo con **IA gratuita opcional** (Groq o Gemini): explica qué es, qué señales raras tiene, el riesgo y qué hacer, sin abrir nada más en el host.
 
 ### Geolocalizar resultados
 
@@ -102,6 +106,17 @@ Abrís `http://127.0.0.1:8080`. El panel:
 ```
 
 `scan-isp.ps1` automatiza todo el flujo (escaneo de rangos ISP → geolocalización → recarga del panel), opcionalmente por proxy: `.\scan-isp.ps1 -Proxy socks5://127.0.0.1:9050`.
+
+### Análisis con IA (opcional)
+
+En cualquier ficha del dispositivo, el botón "analizar con IA" manda el sondeo ya capturado a Groq o Gemini:
+
+```powershell
+# la clave se guarda localmente en ai_key.json (nunca se sube al repo)
+Invoke-RestMethod http://127.0.0.1:8080/ai/config -Method Post -Body '{"provider":"groq","key":"TU_CLAVE"}' -ContentType "application/json"
+```
+
+La IA responde en español: qué es el dispositivo, qué señales delatadoras tiene (trampas, configuraciones expuestas), el riesgo y qué hacer. Solo analiza la información ya capturada: **no abre ni toca nada en el host**. Los datos de `comments.json` y `ai_key.json` están en `.gitignore` y nunca se suben.
 
 ## Formato de salida (JSONL)
 

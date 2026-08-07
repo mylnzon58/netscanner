@@ -171,6 +171,39 @@
   .labcard.labhead { color: #9aa7bd; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #2c3444; }
   .labcmd { margin-top: 10px; background: #0d0f14; border: 1px dashed #3b4a6b; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #9aa7bd; }
   .labcmd code { color: #7ddfa0; font-family: Consolas, monospace; word-break: break-all; }
+  #hero { display: none; max-width: 860px; margin: 26px auto; padding: 0 18px; }
+  #hero h2 { font-size: 19px; margin: 0 0 4px; color: #e5ebf5; }
+  #hero .sub { color: #9aa7bd; font-size: 13px; margin-bottom: 18px; }
+  .suggs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .sugbtn { text-align: left; background: #161a22; border: 1px solid #262d3a; border-radius: 10px; padding: 12px 14px; cursor: pointer; transition: border-color .15s; }
+  .sugbtn:hover { border-color: #4a5878; }
+  .sugbtn .l { color: #8fa3ff; font-weight: 600; font-size: 13.5px; }
+  .sugbtn .h { color: #5b6472; font-size: 11.5px; margin-top: 3px; }
+  .scanform { background: #161a22; border: 1px solid #262d3a; border-radius: 10px; padding: 14px; }
+  .scanform .lbl { font-size: 11px; color: #9aa7bd; text-transform: uppercase; letter-spacing: .5px; margin: 10px 0 5px; }
+  .scanform .lbl:first-child { margin-top: 0; }
+  .scanrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .scanrow input { flex: 1; min-width: 220px; }
+  .scanrow input.small { flex: 0 0 110px; min-width: 90px; }
+  #scanGo { background: #2a3550; border: 1px solid #3b4a6b; color: #c8d2e3; padding: 8px 18px; font-size: 13px; }
+  #scanGo:hover { background: #33406a; }
+  #scanStop { display: none; background: #3a2020; border: 1px solid #5a3030; color: #ff8f8f; }
+  .scanlog { margin-top: 12px; background: #0d0f14; border: 1px solid #1d232f; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #9aa7bd; max-height: 220px; overflow: auto; white-space: pre-wrap; font-family: Consolas, monospace; display: none; }
+  .scanlog .l { display: block; }
+  .scanlog .s { color: #7ddfa0; }
+  .tech { display: flex; gap: 5px; flex-wrap: wrap; margin: 8px 0; }
+  .techchip { background: #1e2b3d; color: #8fa3ff; border: 1px solid #2c3a55; border-radius: 10px; padding: 2px 9px; font-size: 11.5px; }
+  .sigrow { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed #1d232f; color: #c8d2e3; }
+  .sigrow .e { font-size: 15px; }
+  .sigrow .why { color: #5b6472; font-size: 11.5px; display: block; margin-top: 1px; }
+  .sigok { color: #7ddfa0; font-size: 12.5px; }
+  .cbox { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cbox textarea { flex: 1; min-width: 260px; background: #161a22; color: #d8dee9; border: 1px solid #2c3444; border-radius: 6px; padding: 8px; font-size: 12.5px; font-family: inherit; resize: vertical; }
+  .cbox textarea::placeholder { color: #5b6472; }
+  .aiwrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #dAiOut { margin-top: 8px; background: #0d0f14; border: 1px solid #1d232f; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; white-space: pre-wrap; color: #c8d2e3; display: none; }
+  #dAiCfg { background: #1c212c; border: 1px solid #2c3444; color: #9aa7bd; font-size: 11.5px; }
+  .muted2 { color: #5b6472; font-size: 11.5px; }
 </style>
 </head>
 <body>
@@ -181,8 +214,30 @@
   <span class="stat">registros: <b id="cTotal">0</b></span>
   <span class="stat">IPs únicas: <b id="cIPs">0</b></span>
   <span class="stat">actualizado: <b id="cTime">–</b></span>
+  <button class="gbtn" id="newScanBtn">🆕 Escanear</button>
   <button class="gbtn" id="guideBtn">❓ Guía rápida</button>
 </header>
+<div id="hero">
+  <h2>¿Qué querés escanear o analizar?</h2>
+  <div class="sub">Elegí una propuesta o escribí tu objetivo (red, IP o dominio). Todo queda en tu PC; el panel no sube datos.</div>
+  <div class="suggs" id="suggs"><div class="empty">cargando propuestas…</div></div>
+  <div class="scanform">
+    <div class="lbl">Objetivo · red, IP o dominio</div>
+    <div class="scanrow">
+      <input id="scanTarget" type="text" spellcheck="false" placeholder="ej: 192.168.1.0/24  ·  203.0.113.7  ·  ejemplo.com">
+      <input id="scanPorts" class="small" type="text" spellcheck="false" title="puertos" placeholder="80,443,8080,554,21,22,5000,5001" value="80,443,8080,8000,554,21,22,5000,5001">
+      <input id="scanProxy" class="small" type="text" spellcheck="false" title="proxy SOCKS5 (opcional, TOR)" placeholder="proxy opcional (9050)">
+    </div>
+    <div class="scanrow" style="margin-top:10px">
+      <input id="scanWorkers" class="small" type="text" spellcheck="false" title="conexiones en paralelo" value="200">
+      <input id="scanTimeout" class="small" type="text" spellcheck="false" title="timeout en ms" value="1500">
+      <button id="scanGo">▶ Escanear</button>
+      <button id="scanStop">⏹ Detener</button>
+      <span class="muted2" id="scanHint"></span>
+    </div>
+    <div class="scanlog" id="scanLog"></div>
+  </div>
+</div>
 <div id="guideModal"><div class="box">
   <div class="mhead"><b>❓ Guía rápida · qué se puede y qué no</b><button id="gClose">✕</button></div>
   <div class="gsec scroll">
@@ -221,7 +276,7 @@
     </div>
   </div>
   <div class="labrow">
-    <input id="labIn" type="text" spellcheck="false" placeholder="ej: 45.226.10.2  o  ejemplo.com.ar">
+    <input id="labIn" type="text" spellcheck="false" placeholder="ej: 203.0.113.7  o  ejemplo.com.ar">
     <button id="labGo">🔍 consultar</button>
     <button id="labCmd">⚡ comando para escanear</button>
   </div>
@@ -292,7 +347,7 @@
   <select id="fPort"><option value="">todos los puertos</option></select>
   <select id="fHttp"><option value="">cualquier estado</option><option>200</option><option>301</option><option>302</option><option>308</option><option>0</option></select>
   <select id="fType"><option value="">todos los tipos</option></select>
-  <select id="fRng"><option value="">todos los rangos</option><option value="0">198.51.100.0/21</option><option value="1">198.51.101.0/22</option><option value="2">203.0.113.0/22</option><option value="3">203.0.114.0/22</option><option value="otras">otras</option></select>
+  <select id="fRng"><option value="">todos los rangos</option><option value="otras">otras</option></select>
   <select id="fCity"><option value="">todas las ciudades</option></select>
   <button id="export">⬇ exportar CSV</button>
   <button id="clear">limpiar vista</button>
@@ -325,8 +380,11 @@
 
 <div id="devModal"><div class="box">
   <div class="mhead"><span id="dTitleIco" style="font-size:22px"></span><b id="dTitle"></b><span id="dRisk"></span><span class="stat" id="dMeta"></span><button id="dClose">✕</button></div>
-  <div class="dsec"><h4>servicios abiertos</h4><div id="dPorts" class="dservs"></div></div>
+  <div class="dsec"><h4>servicios abiertos</h4><div id="dPorts" class="dservs"></div><div id="dTech" class="tech"></div></div>
   <div class="dsec"><h4>alertas de exposición</h4><div id="dAlerts" class="dbadges"></div></div>
+  <div class="dsec"><h4>señales para no caer en trampas</h4><div id="dSignals"></div></div>
+  <div class="dsec"><h4>mis notas sobre este dispositivo</h4><div class="cbox"><textarea id="dComment" placeholder="ej: este router es el de mi tío, tiene la contraseña vieja; no tocar el firmware…"></textarea><button class="ftpbtn" id="dCommentSave">guardar nota</button></div><div class="muted2" id="dCommentMsg"></div></div>
+  <div class="dsec"><h4>🤖 análisis con IA (opcional)</h4><div class="aiwrap"><button class="ftpbtn" id="dAiBtn">analizar con IA</button><button class="ftpbtn" id="dAiCfg">⚙️ clave</button><span class="muted2">groq.com o Google AI Studio gratis · se analiza solo lo ya capturado, sin abrir nada nuevo</span></div><div id="dAiOut"></div></div>
   <div class="dsec"><h4>vista previa automática</h4><div id="dPrev" class="dprev"></div></div>
   <div class="dsec scroll"><h4>servicios y contenido</h4><div id="dServs"></div></div>
   <div class="dsec scroll"><h4>archivos listados</h4><div id="dFiles" class="dfiles"></div></div>
@@ -471,12 +529,27 @@ function deviceMap() {
   return byIp;
 }
 
-const ISP_RANGES = [
-  { name: "198.51.100.0/21", color: "#9db6ff", a: [190, 14, 144], len: 21 },
-  { name: "198.51.101.0/22", color: "#7ddfa0", a: [190, 107, 172], len: 22 },
-  { name: "203.0.113.0/22", color: "#ffb86b", a: [45, 226, 8], len: 22 },
-  { name: "203.0.114.0/22", color: "#d3a0ff", a: [179, 48, 252], len: 22 }
-];
+// Los rangos se calculan solos a partir de los datos escaneados
+// (los /24 con más dispositivos), así el panel sirve para cualquier
+// conexión sin datos personales grabados en el código.
+let ISP_RANGES = [];
+const RNG_COLORS = ["#9db6ff", "#7ddfa0", "#ffb86b", "#d3a0ff", "#ff9db0", "#9de6d2", "#c9d15f", "#b49bff"];
+function computeRanges() {
+  const counts = {};
+  for (const r of state.records) {
+    const p = (r.ip || "").split(".");
+    if (p.length !== 4) continue;
+    const k = p.slice(0, 3).join(".");
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 8);
+  ISP_RANGES = top.map((k, i) => ({
+    name: k + ".0/24",
+    color: RNG_COLORS[i % RNG_COLORS.length],
+    a: k.split(".").map(Number),
+    len: 24
+  }));
+}
 function ipToInt(ip) {
   const p = (ip || "").split(".").map(Number);
   if (p.length !== 4 || p.some(x => !Number.isFinite(x))) return null;
@@ -492,6 +565,9 @@ function rngIndex(ip) {
     if ((n >>> bits) === (base >>> bits)) return i;
   }
   return -1;
+}
+function rngNameOK(name) {
+  return ISP_RANGES.some(r => r.name === name);
 }
 
 function stats() {
@@ -578,7 +654,7 @@ function filtered() {
     if (fr) {
       const ri = rngIndex(r.ip);
       if (fr === "otras") { if (ri >= 0) return false; }
-      else if (ri !== Number(fr)) return false;
+      else if (!rngNameOK(fr) || ISP_RANGES[ri] && ISP_RANGES[ri].name !== fr) return false;
     }
     if (fc && (r.geo && r.geo.city || "") !== fc) return false;
     if (!q) return true;
@@ -592,7 +668,16 @@ function render() {
   timer = setTimeout(() => { timer = null; paint(); }, 150);
 }
 function paint() {
+  showHero(!state.records.length);
   state.devMap = deviceMap();
+  computeRanges();
+  const frSel = $("fRng");
+  const curR = frSel.value;
+  const rNames = ISP_RANGES.map(r => r.name);
+  if (frSel.options.length - 2 !== rNames.length || (curR !== "" && curR !== "otras" && !rNames.includes(curR))) {
+    frSel.innerHTML = '<option value="">todos los rangos</option>' + rNames.map(n => '<option value="' + esc(n) + '">' + esc(n) + "</option>").join("") + '<option value="otras">otras</option>';
+    frSel.value = rNames.includes(curR) ? curR : "";
+  }
   buildCharts();
   buildDevices(state.devMap);
   buildFindings(state.devMap);
@@ -968,9 +1053,9 @@ $("guideModal").addEventListener("click", e => { if (e.target.id === "guideModal
 function labQuery() {
   let raw = $("labIn").value.trim();
   const demo = !raw;
-  if (demo) raw = "45.226.10.2";
+  if (demo) raw = "203.0.113.7";
   const out = $("labOut");
-  out.innerHTML = '<div class="empty">' + (demo ? "campo vacío → consultando ejemplo: <b>45.226.10.2</b> (tu IP pública). Escribí otra IP o dominio y volvé a pulsar." : "consultando…") + "</div>";
+  out.innerHTML = '<div class="empty">' + (demo ? "campo vacío → consultando ejemplo: <b>203.0.113.7</b>. Escribí otra IP o dominio y volvé a pulsar." : "consultando…") + "</div>";
   const isIP = /^\d{1,3}(\.\d{1,3}){3}$/.test(raw);
   const jobs = [];
   if (isIP) {
@@ -1018,8 +1103,8 @@ $("labIn").addEventListener("keydown", e => { if (e.key === "Enter") labQuery();
 $("labCmd").addEventListener("click", () => {
   let raw = $("labIn").value.trim();
   if (!raw) {
-    raw = "45.226.10.2";
-    $("labCmdOut").innerHTML = '<div class="labcmd">campo vacío → ejemplo con tu IP pública 45.226.10.2:</div>';
+    raw = "203.0.113.7";
+    $("labCmdOut").innerHTML = '<div class="labcmd">campo vacío → ejemplo con una IP de documentación:</div>';
   }
   const cidr = /^\d{1,3}(\.\d{1,3}){3}$/.test(raw) ? raw + "/32" : raw;
   const cmd = ".\\netscanner.exe -c " + cidr + " -p 80,443,8080,8000,554,21,22,5000,5001 -o " + (raw.replace(/[^a-z0-9]/gi, "_") || "target") + ".jsonl --proxy socks5://127.0.0.1:9050";
@@ -1157,11 +1242,15 @@ $("mBack").addEventListener("click", navBack);
 function openDev(ip) {
   const d = state.devMap && state.devMap[ip];
   if (!d) return;
+  openDevIp = ip;
   $("dTitleIco").textContent = typeIcon(d.topType);
   $("dTitle").textContent = d.ip;
   $("dRisk").innerHTML = riskBadge(d.risk);
   $("dMeta").textContent = [d.city, d.isp].filter(Boolean).join(" · ");
   $("dPorts").innerHTML = d.portsA.map(p => '<span class="dserv">' + portIcon(p) + " " + p + "</span>").join("");
+  renderSignals(d);
+  renderTech(d);
+  refreshComment(d);
   const alerts = [];
   if (d.ftp) alerts.push("📂 " + d.ftp + " FTP con acceso anónimo");
   if (d.dav) alerts.push("🗄️ " + d.dav + " WebDAV expuesto (PROPFIND ok)");
@@ -1297,6 +1386,200 @@ ev.onerror = () => { $("status").textContent = "desconectado (reintentando…)";
 
 loadLeaflet();
 loadMyIP();
+loadComments();
+loadSuggest();
+setInterval(pollScanStatus, 1200);
+pollScanStatus();
+
+// ---- señales de trampa / riesgo (heurística local, no abre nada) ----
+
+function signalsFor(r) {
+  const b = r.banner || {};
+  const s = (b.server || "").toLowerCase();
+  const t = (b.title || "").toLowerCase();
+  const body = (b.body || "").toLowerCase();
+  const hd = b.headers || {};
+  const out = [];
+  const push = (emoji, txt, why) => out.push({ emoji, txt, why });
+  if (b.ftp_auth === "anonymous") push("📂", "FTP con login anónimo habilitado", "cualquiera puede entrar y leer/escribir archivos");
+  if (b.dav) push("🗄️", "WebDAV responde sin credenciales", "permite listar y a veces modificar archivos por HTTP");
+  if (body.includes("index of") || body.includes("parent directory")) push("📂", "Listado de directorio abierto", "se ve todo el contenido sin login");
+  if (t.includes("login") || t.includes("sign in") || t.includes("authentication") || t.includes("ingrese")) push("🔐", "Página de login accesible", "si usa credenciales por defecto es una puerta abierta");
+  if (/default|por defecto|admin\/admin|root|toor|changeme|1234|password/i.test(body.slice(0, 4000))) push("🔑", "Textos típicos de credenciales por defecto", "posible configuración de fábrica sin cambiar");
+  if (s.includes("micro_httpd") || s.includes("mini_httpd") || s.includes("boa") || s.includes("thttpd")) push("⚙️", "Servidor web de dispositivo embebido", "suele ser una cámara/CPE con web simple y sin parches");
+  if (t.includes("honeypot") || t.includes("canary") || t.includes("decoy") || t.includes("trampa")) push("🚩", "Título sugiere honeypot o trampa", "podría ser un señuelo para atraer escaneos");
+  if (hd["www-authenticate"]) push("🔐", "Pide autenticación HTTP", "acceso restringido por usuario/contraseña básica");
+  if (b.redirect && /https/.test(b.redirect) && r.port === 80) push("🔒", "Redirige a HTTPS", "comportamiento normal, el contenido vive en 443");
+  if (r.port === 554 || r.port === 34567 || r.port === 37777 || /camera|hikvision|dahua|xmeye|netvision|dvr|rtsp/i.test(s + " " + t)) push("🎥", "Parece cámara o DVR", "los modelos viejos suelen traer contraseña de fábrica");
+  if (t.includes("kaon") || t.includes("routeros") || t.includes("mikrotik") || t.includes("epmp") || t.includes("cpe")) push("📡", "Router/CPE de proveedor", "puede tener credenciales de fábrica conocidas");
+  if (/admin|administrator|setup|panel/i.test(t) && !/login/i.test(t)) push("⚙️", "Panel de administración visible", "acceso de gestión sin pasar por un login");
+  return out;
+}
+
+function renderSignals(dev) {
+  const el = $("dSignals");
+  const seen = new Set();
+  const rows = [];
+  for (const r of dev.recs) {
+    for (const sg of signalsFor(r)) {
+      const k = sg.emoji + sg.txt;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      rows.push('<div class="sigrow"><span class="e">' + sg.emoji + "</span><span>" + sg.txt + '<span class="why">' + esc(sg.why) + "</span></span></div>");
+    }
+  }
+  el.innerHTML = rows.length ? rows.join("") : '<span class="sigok">✅ sin señales de trampa ni exposición obvia en los datos capturados</span>';
+}
+
+function renderTech(dev) {
+  const techs = new Set();
+  for (const r of dev.recs) {
+    const t = (r.banner && r.banner.tech) || [];
+    for (const x of t) techs.add(x);
+    if (r.banner && r.banner.cdn) techs.add("☁️ " + r.banner.cdn);
+  }
+  $("dTech").innerHTML = techs.size ? [...techs].map(x => '<span class="techchip">' + esc(x) + "</span>").join("")
+    : '<span class="muted2">sin tecnologías detectadas</span>';
+}
+
+// ---- comentarios por dispositivo ----
+
+const comments = {};
+function loadComments() {
+  fetch("/comments").then(r => r.json()).then(d => Object.assign(comments, d)).catch(() => {});
+}
+function devKey(d) {
+  const p = d.view ? d.view.port : (d.portsA[0] || 0);
+  return d.ip + ":" + p;
+}
+let openDevIp = null;
+function refreshComment(d) {
+  const k = devKey(d);
+  $("dComment").value = comments[k] || "";
+  $("dCommentMsg").textContent = "";
+}
+$("dCommentSave").addEventListener("click", () => {
+  const d = openDevIp && state.devMap && state.devMap[openDevIp];
+  if (!d) return;
+  const k = devKey(d);
+  const text = $("dComment").value.trim();
+  fetch("/comments/set", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, text }) })
+    .then(r => r.json()).then(() => {
+      if (text) comments[k] = text; else delete comments[k];
+      $("dCommentMsg").textContent = text ? "✅ nota guardada en tu PC" : "nota borrada";
+    }).catch(() => { $("dCommentMsg").textContent = "❌ no se pudo guardar"; });
+});
+
+// ---- IA opcional ----
+
+let aiKey = null;
+let aiProvider = "groq";
+fetch("/ai/config").then(r => r.json()).then(c => {
+  if (c) { aiKey = c.set ? "1" : null; aiProvider = c.provider || "groq"; }
+}).catch(() => {});
+$("dAiCfg").addEventListener("click", () => {
+  const prov = prompt("Proveedor (groq o gemini):", aiProvider || "groq");
+  if (prov !== "groq" && prov !== "gemini") return;
+  const key = prompt("Clave API gratuita:\nGroq → console.groq.com (crear cuenta gratis, API Keys)\nGemini → aistudio.google.com (Get API key).\nSe guarda solo en tu PC (ai_key.json, ignorado por git).", "");
+  if (key == null) return;
+  aiProvider = prov;
+  fetch("/ai/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: prov, key }) })
+    .then(r => r.json()).then(() => { aiKey = "1"; $("dAiCfg").textContent = "⚙️ clave (guardada)"; })
+    .catch(() => alert("no se pudo guardar la clave"));
+});
+$("dAiBtn").addEventListener("click", () => {
+  const d = openDevIp && state.devMap && state.devMap[openDevIp];
+  if (!d) return;
+  const out = $("dAiOut");
+  out.style.display = "block";
+  if (!aiKey) { out.textContent = "Primero configurá una clave gratuita (botón ⚙️ clave). Es opcional: sin IA el panel ya te muestra las señales de riesgo."; return; }
+  out.textContent = "analizando con " + (aiProvider === "groq" ? "Groq" : "Gemini") + "… esto puede tardar unos segundos";
+  fetch("/ai/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: devKey(d) }) })
+    .then(r => r.ok ? r.json() : Promise.reject({ r }))
+    .then(j => { out.textContent = j.answer; })
+    .catch(err => {
+      const st = err && err.r ? err.r.status : 0;
+      if (st === 400) { out.textContent = "Primero configurá una clave gratuita (botón ⚙️ clave)."; aiKey = null; }
+      else out.textContent = "❌ la IA no respondió (" + (err.r ? err.r.status : "red") + "). Revisá tu clave o probá más tarde.";
+    });
+});
+
+// ---- escaneo desde el panel ----
+
+function loadSuggest() {
+  fetch("/suggest").then(r => r.json()).then(items => {
+    const box = $("suggs");
+    if (!items.length) { box.innerHTML = '<div class="empty">sin propuestas</div>'; return; }
+    box.innerHTML = items.map(s =>
+      '<button class="sugbtn" data-v="' + esc(s.value) + '"><span class="l">' + esc(s.label) + "</span><span class=\"h\">" + esc(s.hint) + "</span></button>"
+    ).join("");
+    box.querySelectorAll(".sugbtn").forEach(b => b.addEventListener("click", () => {
+      $("scanTarget").value = b.dataset.v;
+      $("scanTarget").focus();
+    }));
+  }).catch(() => { $("suggs").innerHTML = '<div class="empty">sin propuestas (panel arranca igual)</div>'; });
+}
+function showHero(show) {
+  $("hero").style.display = show ? "block" : "none";
+  $("newScanBtn").style.display = show ? "none" : "inline-block";
+}
+let scanRunning = false;
+function startScan() {
+  const cidr = $("scanTarget").value.trim();
+  if (!cidr) { alert("Escribí un objetivo: red (192.168.1.0/24), IP o dominio."); return; }
+  const body = {
+    cidr,
+    ports: $("scanPorts").value.trim(),
+    workers: parseInt($("scanWorkers").value, 10) || 200,
+    timeout: parseInt($("scanTimeout").value, 10) || 1500,
+    proxy: $("scanProxy").value.trim() ? "socks5://127.0.0.1:" + $("scanProxy").value.trim() : ""
+  };
+  $("scanLog").style.display = "block";
+  $("scanLog").innerHTML = '<span class="l s">▶ lanzando escaneo de ' + esc(cidr) + "…</span>";
+  $("scanStop").style.display = "inline-block";
+  $("scanGo").disabled = true;
+  fetch("/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(r => r.ok ? r.json() : Promise.reject({ r }))
+    .then(j => { scanRunning = true; })
+    .catch(err => {
+      $("scanLog").innerHTML += '<span class="l">❌ ' + esc((err.r && err.r.status === 409) ? "ya hay un escaneo en curso" : "no se pudo lanzar el escaneo") + "</span>";
+      $("scanStop").style.display = "none";
+      $("scanGo").disabled = false;
+    });
+}
+function stopScan() {
+  fetch("/scanstop", { method: "POST" }).then(() => {
+    $("scanLog").innerHTML += '<span class="l">⏹ detenido por el usuario</span>';
+    $("scanStop").style.display = "none";
+    $("scanGo").disabled = false;
+    scanRunning = false;
+  });
+}
+function pollScanStatus() {
+  fetch("/scanstatus").then(r => r.json()).then(s => {
+    if (!s) return;
+    if (s.busy) {
+      scanRunning = true;
+      $("scanStop").style.display = "inline-block";
+      $("scanGo").disabled = true;
+      $("scanLog").style.display = "block";
+      const logEl = $("scanLog");
+      const last = logEl.lastChild ? logEl.lastChild.textContent : "";
+      const lines = (s.log || []).filter(l => l && last !== l);
+      for (const l of lines) logEl.innerHTML += '<span class="l">' + esc(l) + "</span>";
+      logEl.scrollTop = logEl.scrollHeight;
+    } else if (scanRunning) {
+      scanRunning = false;
+      $("scanStop").style.display = "none";
+      $("scanGo").disabled = false;
+      $("scanLog").innerHTML += '<span class="l s">✓ escaneo finalizado</span>';
+    }
+  }).catch(() => {});
+}
+$("scanGo").addEventListener("click", startScan);
+$("scanStop").addEventListener("click", stopScan);
+$("scanTarget").addEventListener("keydown", e => { if (e.key === "Enter") startScan(); });
+$("newScanBtn").addEventListener("click", () => showHero(true));
 </script>
 </body>
 </html>

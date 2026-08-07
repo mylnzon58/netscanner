@@ -31,6 +31,9 @@ func NewTailer(path string) (*Tailer, error) {
 	return &Tailer{path: path, file: f}, nil
 }
 
+// Path devuelve la ruta del archivo que se está siguiendo.
+func (t *Tailer) Path() string { return t.path }
+
 // Close libera el archivo subyacente.
 func (t *Tailer) Close() error { return t.file.Close() }
 

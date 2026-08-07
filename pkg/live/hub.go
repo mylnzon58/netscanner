@@ -54,6 +54,13 @@ func (h *Hub) Snapshot() []byte {
 	return data
 }
 
+// Reset vacía el historial, para empezar un escaneo nuevo desde cero.
+func (h *Hub) Reset() {
+	h.mu.Lock()
+	h.history = nil
+	h.mu.Unlock()
+}
+
 // Subscribe registra un cliente nuevo y devuelve su canal de eventos.
 func (h *Hub) Subscribe() (*Client, <-chan []byte) {
 	c := &Client{ch: make(chan []byte, 512)}

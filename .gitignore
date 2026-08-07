@@ -14,6 +14,10 @@ tools/
 # Logs
 *.log
 
+# Notas locales y clave de IA (nunca se suben)
+comments.json
+ai_key.json
+
 # OS
 .DS_Store
 Thumbs.db

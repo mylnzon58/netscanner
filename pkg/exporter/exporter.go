@@ -14,16 +14,20 @@ const bufSize = 64 * 1024
 
 // Banner es la huella del servicio que hay detrás de un puerto abierto.
 type Banner struct {
-	IsHTTP     bool   `json:"http"`
-	StatusCode int    `json:"status_code"`
-	Server     string `json:"server"`
-	Title      string `json:"title"`
-	Raw        string `json:"raw"`
-	Body       string `json:"body,omitempty"`
-	FTPAuth    string `json:"ftp_auth,omitempty"`
-	FTPBanner  string `json:"ftp_banner,omitempty"`
-	DAV        bool   `json:"dav,omitempty"`
-	DAVBody    string `json:"dav_body,omitempty"`
+	IsHTTP     bool              `json:"http"`
+	StatusCode int               `json:"status_code"`
+	Server     string            `json:"server"`
+	Title      string            `json:"title"`
+	Raw        string            `json:"raw"`
+	Body       string            `json:"body,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Tech       []string          `json:"tech,omitempty"`
+	Redirect   string            `json:"redirect,omitempty"`
+	CDN        string            `json:"cdn,omitempty"`
+	FTPAuth    string            `json:"ftp_auth,omitempty"`
+	FTPBanner  string            `json:"ftp_banner,omitempty"`
+	DAV        bool              `json:"dav,omitempty"`
+	DAVBody    string            `json:"dav_body,omitempty"`
 }
 
 // Geo es la ubicación de la dirección escaneada. ISP, ASN y Org solo se

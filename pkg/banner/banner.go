@@ -49,6 +49,9 @@ type Info struct {
 	Title      string
 	Raw        string
 	Body       string
+	Headers    map[string]string
+	Tech       []string
+	Redirect   string
 	FTPAuth    string
 	FTPBanner  string
 	DAV        bool
@@ -71,7 +74,7 @@ func Probe(conn net.Conn, ip string, port int, maxBody int) Info {
 
 func probeHTTP(conn net.Conn, ip string, maxBody int) Info {
 	info := Info{IsHTTP: true}
-	req := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nUser-Agent: %s\r\nConnection: close\r\n\r\n", ip, UserAgent)
+	req := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nUser-Agent: %s\r\nAccept: text/html,application/xhtml+xml,*/*;q=0.8\r\nConnection: close\r\n\r\n", ip, UserAgent)
 	if _, err := conn.Write([]byte(req)); err != nil {
 		return info
 	}
@@ -83,6 +86,7 @@ func probeHTTP(conn net.Conn, ip string, maxBody int) Info {
 	parseHTTP(data, &info)
 	info.Raw = truncate(strings.TrimSpace(data), MaxRead)
 	info.Body = strings.TrimSpace(data)
+	info.Tech = detectTech(&info)
 	return info
 }
 
@@ -257,14 +261,90 @@ func parseHTTP(data string, info *Info) {
 			info.StatusCode = code
 		}
 	}
+	info.Headers = make(map[string]string)
 	for _, line := range lines[1:] {
-		if h := strings.SplitN(line, ":", 2); len(h) == 2 &&
-			strings.EqualFold(strings.TrimSpace(h[0]), "server") {
-			info.Server = strings.TrimSpace(h[1])
+		if line == "" {
 			break
+		}
+		if h := strings.SplitN(line, ":", 2); len(h) == 2 {
+			key := strings.ToLower(strings.TrimSpace(h[0]))
+			val := strings.TrimSpace(h[1])
+			if key == "server" && info.Server == "" {
+				info.Server = val
+			}
+			if key == "location" && info.Redirect == "" {
+				info.Redirect = val
+			}
+			if key == "server" || key == "x-powered-by" || key == "www-authenticate" ||
+				key == "x-generator" || key == "set-cookie" || key == "x-frame-options" {
+				info.Headers[key] = val
+			}
 		}
 	}
 	if m := titleRe.FindStringSubmatch(data); len(m) == 2 {
 		info.Title = strings.TrimSpace(m[1])
 	}
+}
+
+// techRules son señales baratas de detección de tecnologías, sin
+// contacto extra: se miran los headers ya capturados y el HTML.
+type techRule struct {
+	name    string
+	re      *regexp.Regexp
+	inBody  bool
+	header  string
+	headerV string
+}
+
+var techRules = []techRule{
+	{name: "Cloudflare", header: "server", headerV: "cloudflare"},
+	{name: "nginx", header: "server", headerV: "nginx"},
+	{name: "Apache", header: "server", headerV: "apache"},
+	{name: "IIS", header: "server", headerV: "microsoft-iis"},
+	{name: "LiteSpeed", header: "server", headerV: "litespeed"},
+	{name: "OpenResty", header: "server", headerV: "openresty"},
+	{name: "Caddy", header: "server", headerV: "caddy"},
+	{name: "PHP", header: "x-powered-by", headerV: "php"},
+	{name: "ASP.NET", header: "x-powered-by", headerV: "asp.net"},
+	{name: "Express", header: "x-powered-by", headerV: "express"},
+	{name: "WordPress", re: regexp.MustCompile(`(?i)wp-content|wp-includes|wordpress`)},
+	{name: "Joomla", re: regexp.MustCompile(`(?i)joomla`)},
+	{name: "Drupal", re: regexp.MustCompile(`(?i)drupal`)},
+	{name: "Laravel", re: regexp.MustCompile(`(?i)laravel`)},
+	{name: "Django", re: regexp.MustCompile(`(?i)django`)},
+	{name: "Flask", re: regexp.MustCompile(`(?i)flask`)},
+	{name: "Ruby on Rails", re: regexp.MustCompile(`(?i)rails`)},
+	{name: "jQuery", re: regexp.MustCompile(`(?i)jquery`)},
+	{name: "Bootstrap", re: regexp.MustCompile(`(?i)bootstrap`)},
+	{name: "React", re: regexp.MustCompile(`(?i)react`)},
+	{name: "Vue.js", re: regexp.MustCompile(`(?i)vue\.js|vuejs`)},
+	{name: "Next.js", re: regexp.MustCompile(`(?i)next\.js|__next`)},
+	{name: "Shopify", re: regexp.MustCompile(`(?i)shopify`)},
+	{name: "Magento", re: regexp.MustCompile(`(?i)magento|mage-`)},
+	{name: "PrestaShop", re: regexp.MustCompile(`(?i)prestashop`)},
+	{name: "WooCommerce", re: regexp.MustCompile(`(?i)woocommerce`)},
+	{name: "Google Analytics", re: regexp.MustCompile(`(?i)google-analytics|gtag`)},
+	{name: "Plesk", re: regexp.MustCompile(`(?i)plesk`)},
+	{name: "cPanel", re: regexp.MustCompile(`(?i)cpanel`)},
+}
+
+// detectTech mira los headers y el HTML capturados y devuelve las
+// tecnologías que reconoce, sin mandar ninguna petición extra.
+func detectTech(info *Info) []string {
+	var out []string
+	for _, r := range techRules {
+		found := false
+		if r.header != "" {
+			if v, ok := info.Headers[r.header]; ok && strings.Contains(strings.ToLower(v), r.headerV) {
+				found = true
+			}
+		}
+		if r.re != nil && r.re.MatchString(info.Body) {
+			found = true
+		}
+		if found {
+			out = append(out, r.name)
+		}
+	}
+	return out
 }

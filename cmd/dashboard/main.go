@@ -81,6 +81,10 @@ func main() {
 		}
 	}
 
+	loadCommentsRef := loadComments()
+	loadAIConf()
+	app := &app{tailer: tailer, hub: hub}
+
 	go func() {
 		t := time.NewTicker(*poll)
 		defer t.Stop()
@@ -125,6 +129,14 @@ func main() {
 	mux.HandleFunc("/lookup", handleLookup)
 	mux.HandleFunc("/shodan", handleShodan)
 	mux.HandleFunc("/iplookup", handleIPLookup)
+	mux.HandleFunc("/scan", app.handleScan)
+	mux.HandleFunc("/scanstop", app.handleScanStop)
+	mux.HandleFunc("/scanstatus", app.handleScanStatus)
+	mux.HandleFunc("/suggest", app.handleSuggest)
+	mux.HandleFunc("/comments", loadCommentsRef.handleGet)
+	mux.HandleFunc("/comments/set", loadCommentsRef.handleSet)
+	mux.HandleFunc("/ai/config", app.handleAIConfig)
+	mux.HandleFunc("/ai/analyze", app.handleAIAnalyze)
 
 	srv := &http.Server{Addr: *addr, Handler: mux}
 	go func() {
