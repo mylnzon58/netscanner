@@ -1,0 +1,19 @@
+# Binaries
+*.exe
+*.exe~
+
+# Scan results and data files
+*.jsonl
+*.csv
+scan_stats.json
+GeoLite2-*.mmdb
+
+# Local Tor bundle (installed by anon.ps1)
+tools/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

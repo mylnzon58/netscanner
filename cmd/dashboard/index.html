@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>netscanner · live</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #0f1115; color: #d8dee9; }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #161a22; border-bottom: 1px solid #262d3a; position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; color: #8fa3ff; font-weight: 600; }
+  #status { font-size: 12px; padding: 3px 10px; border-radius: 12px; background: #3a3f4b; }
+  #status.live { background: #1e3a2a; color: #7ddfa0; }
+  #status.dead { background: #3a2020; color: #ff8f8f; }
+  .stat { font-size: 12px; color: #9aa7bd; }
+  .stat b { color: #e5ebf5; }
+  .conn { font-size: 12px; background: #1c2433; border: 1px solid #2c3a55; border-radius: 12px; padding: 3px 10px; color: #9db6ff; }
+  .conn b { color: #e5ebf5; }
+  #prog { display: none; padding: 8px 16px; background: #131722; border-bottom: 1px solid #262d3a; font-size: 12.5px; }
+  #prog .row { display: flex; gap: 22px; margin-bottom: 6px; color: #9aa7bd; flex-wrap: wrap; }
+  #prog b { color: #e5ebf5; }
+  .bar { height: 7px; background: #1c212c; border-radius: 4px; overflow: hidden; }
+  #pBar { height: 100%; width: 0%; background: linear-gradient(90deg,#5b7cfa,#8fa3ff,#7ddfa0); transition: width .4s; }
+  .rate-spark { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .rate-spark svg { width: 100%; height: 26px; background: #10131a; border-radius: 4px; border: 1px solid #1d232f; }
+  .cards { display: flex; gap: 10px; padding: 12px 16px 8px; flex-wrap: wrap; }
+  .card { background: #161a22; border: 1px solid #262d3a; border-radius: 8px; padding: 10px 14px; min-width: 118px; flex: 1; max-width: 180px; }
+  .card .v { font-size: 20px; font-weight: 700; color: #8fa3ff; }
+  .card .k { font-size: 11px; color: #9aa7bd; text-transform: uppercase; letter-spacing: .5px; }
+  .mapsec { position: relative; padding: 8px 16px; }
+  .maphead { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding-bottom: 8px; }
+  .maphead h2 { margin: 0; font-size: 14px; color: #9aa7bd; text-transform: uppercase; letter-spacing: .5px; }
+  .maphead .sub { font-size: 11px; color: #5b6472; }
+  #map { width: 100%; height: 430px; background: #1a2030; border: 1px solid #262d3a; border-radius: 8px; z-index: 1; }
+  #mapMsg { position: absolute; left: 16px; right: 16px; top: 0; bottom: 56px; display: flex; align-items: center; justify-content: center; text-align: center; color: #8a94a8; font-size: 12.5px; pointer-events: none; z-index: 3; }
+  #mapMsg code { color: #9db6ff; }
+  #mapMsg.hidden { display: none; }
+  .rngrow { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .rngcard { flex: 1; min-width: 200px; background: #161a22; border: 1px solid #262d3a; border-left: 4px solid #6c7aa8; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
+  .rngcard .n { font-family: Consolas, monospace; color: #e5ebf5; font-weight: 700; }
+  .rngcard .m { color: #9aa7bd; margin-top: 3px; }
+  .rngcard .chips { margin-top: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 10px; padding: 8px 16px; }
+  .chart { background: #161a22; border: 1px solid #262d3a; border-radius: 8px; padding: 12px 14px; }
+  .chart h3 { margin: 0 0 10px; font-size: 13px; color: #9aa7bd; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .chart .sub { font-size: 11px; color: #5b6472; margin: -6px 0 10px; }
+  .crow { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 12px; }
+  .crow .lbl { width: 190px; text-align: right; color: #c8d2e3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .crow .trk { flex: 1; height: 14px; background: #1c212c; border-radius: 3px; overflow: hidden; }
+  .crow .fill { height: 100%; border-radius: 3px; transition: width .4s; }
+  .crow .cnt { width: 52px; color: #e5ebf5; font-family: Consolas, monospace; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 11.5px; color: #9aa7bd; }
+  .legend span::before { content: "■"; margin-right: 5px; }
+  .dlist { font-size: 12.5px; }
+  .dlist .drow { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed #1d232f; }
+  .dlist .drow b { color: #e5ebf5; font-family: Consolas, monospace; }
+  .devsec { padding: 8px 16px 12px; }
+  .devsec h2 { margin: 6px 0 2px; font-size: 14px; color: #9aa7bd; text-transform: uppercase; letter-spacing: .5px; }
+  .devsec .sub { font-size: 11px; color: #5b6472; margin-bottom: 10px; }
+  .devcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .devcard { background: #161a22; border: 1px solid #262d3a; border-radius: 8px; padding: 10px 12px; }
+  .devcard .top { display: flex; align-items: center; gap: 10px; }
+  .dicon { font-size: 26px; line-height: 1; }
+  .devcard .ip { font-family: Consolas, monospace; color: #e5ebf5; font-weight: 700; font-size: 13.5px; }
+  .devcard .meta { font-size: 11px; color: #9aa7bd; margin-top: 2px; }
+  .dservs { display: flex; gap: 5px; flex-wrap: wrap; margin: 8px 0; }
+  .dserv { background: #1c212c; border: 1px solid #2c3444; border-radius: 6px; padding: 2px 7px; font-size: 11.5px; font-family: Consolas, monospace; }
+  .dbadges { display: flex; gap: 5px; flex-wrap: wrap; font-size: 11px; }
+  .dbadge { background: #232a38; color: #9db6ff; border-radius: 10px; padding: 2px 8px; }
+  .dbadge.hot { background: #3a2a1e; color: #ffb86b; }
+  .dbadge.good { background: #1e3a2a; color: #7ddfa0; }
+  .controls { display: flex; gap: 10px; padding: 10px 16px 12px; flex-wrap: wrap; }
+  input, select, button { background: #1c212c; color: #d8dee9; border: 1px solid #2c3444; border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+  input { width: 280px; }
+  button { cursor: pointer; }
+  button:hover { border-color: #4a5878; }
+  label { font-size: 12px; color: #9aa7bd; display: flex; align-items: center; gap: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; padding: 6px 10px; color: #9aa7bd; background: #131722; position: sticky; top: 48px; border-bottom: 1px solid #262d3a; user-select: none; }
+  td { padding: 6px 10px; border-bottom: 1px solid #1d232f; font-family: Consolas, monospace; white-space: nowrap; }
+  tr:hover td { background: #171d29; }
+  tr.detail td { white-space: pre-wrap; word-break: break-all; background: #10131a; font-size: 11.5px; }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; }
+  .tag.w80 { background: #23304f; color: #9db6ff; }
+  .tag.w443 { background: #1e3a2a; color: #7ddfa0; }
+  .tag.w554 { background: #3a2a1e; color: #ffb86b; }
+  .tag.other { background: #33263d; color: #d3a0ff; }
+  .chip { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10.5px; margin-left: 6px; background: #232a38; color: #9db6ff; vertical-align: 1px; }
+  .code { color: #ffb86b; }
+  .vbtn { color: #8fa3ff; cursor: pointer; text-decoration: underline; }
+  .empty { padding: 40px; text-align: center; color: #5b6472; }
+  #err { color: #ff8f8f; font-size: 12px; padding: 0 16px 8px; }
+  #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000; }
+  #modal .box { position: absolute; inset: 6vh 6vw; background: #12151c; border: 1px solid #2c3444; border-radius: 10px; display: flex; flex-direction: column; }
+  .mhead { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #262d3a; }
+  .mhead b { color: #e5ebf5; font-family: Consolas, monospace; font-size: 13px; }
+  .mtabs { display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid #262d3a; }
+  .mtabs button.active { border-color: #8fa3ff; color: #8fa3ff; }
+  .mtabs a { margin-left: auto; color: #7ddfa0; font-size: 13px; }
+  .mnav { display: flex; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #262d3a; }
+  .mnav input { flex: 1; font-family: Consolas, monospace; font-size: 12.5px; }
+  #mClose { margin-left: auto; font-size: 18px; background: none; border: none; color: #9aa7bd; cursor: pointer; }
+  #mBody { flex: 1; overflow: auto; padding: 12px 14px; }
+  #mBody iframe { width: 100%; height: 100%; border: 1px solid #262d3a; border-radius: 6px; background: #fff; }
+  #mBody .text { white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .gallery figure { margin: 0; }
+  .gallery img { width: 100%; height: 130px; object-fit: cover; border-radius: 6px; background: #1c212c; border: 1px solid #262d3a; }
+  .gallery figcaption { font-size: 11px; color: #9aa7bd; word-break: break-all; padding-top: 4px; }
+  .links a { display: block; color: #8fa3ff; word-break: break-all; padding: 3px 0; font-size: 12.5px; }
+  .risk { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .risk-low { background: #1e3a2a; color: #7ddfa0; }
+  .risk-med { background: #3a2a1e; color: #ffb86b; }
+  .risk-high { background: #3a2020; color: #ff8f8f; }
+  .findings { padding: 8px 16px 4px; }
+  .findings .maphead { padding-bottom: 4px; }
+  .frow { display: flex; align-items: center; gap: 10px; background: #161a22; border: 1px solid #262d3a; border-radius: 6px; padding: 7px 12px; margin: 5px 0; font-size: 12.5px; flex-wrap: wrap; }
+  .frow .ip { font-family: Consolas, monospace; color: #e5ebf5; font-weight: 700; }
+  .frow .desc { color: #9aa7bd; }
+  .frow .r { margin-left: auto; }
+  .ipbtn { cursor: pointer; color: #8fa3ff; background: none; border: none; padding: 0; font: inherit; }
+  .ipbtn:hover { text-decoration: underline; }
+  .heatrow { display: grid; grid-template-columns: 130px repeat(8, 1fr); gap: 4px; margin: 3px 0; font-size: 11.5px; font-family: Consolas, monospace; align-items: center; }
+  .heatrow span { background: #151a24; border-radius: 3px; padding: 4px 6px; text-align: center; color: #d8dee9; }
+  .heatrow.heathead span { background: none; color: #5b6472; font-size: 10.5px; text-transform: uppercase; }
+  #chWords { display: flex; gap: 16px; flex-wrap: wrap; }
+  .wcol { flex: 1; min-width: 220px; }
+  .wcol h4 { margin: 0 0 8px; font-size: 11px; color: #9aa7bd; text-transform: uppercase; letter-spacing: .5px; }
+  .wcol .crow .lbl { width: 140px; }
+  #devModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000; }
+  #devModal .box { position: absolute; left: 8vw; right: 8vw; top: 8vh; bottom: 8vh; background: #12151c; border: 1px solid #2c3444; border-radius: 10px; display: flex; flex-direction: column; }
+  .dsec { padding: 10px 14px; border-bottom: 1px solid #1d232f; }
+  .dsec h4 { margin: 0 0 8px; font-size: 11px; color: #9aa7bd; text-transform: uppercase; letter-spacing: .5px; }
+  .dsec.scroll { flex: 1; overflow: auto; }
+  .dservrow { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px dashed #1d232f; font-size: 12px; }
+  .dservrow .t { flex: 1; color: #9aa7bd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dfiles { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dfile { background: #1c212c; border: 1px solid #2c3444; border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-family: Consolas, monospace; color: #c8d2e3; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #modal { z-index: 1001; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #161a22; color: #d8dee9; }
+  .leaflet-popup-content { font-family: "Segoe UI", system-ui, sans-serif; font-size: 12.5px; }
+  .snap { margin-top: 6px; text-align: center; }
+  .snapimg { max-width: 100%; max-height: 210px; border-radius: 6px; border: 1px solid #2c3444; opacity: 0; transition: opacity .35s; background: #10131a; }
+  .snapimg.big { max-height: 260px; }
+  .fthumb { width: 46px; height: 34px; object-fit: cover; border-radius: 4px; border: 1px solid #2c3444; background: #10131a; vertical-align: middle; }
+  .dprev { display: flex; flex-direction: column; gap: 8px; }
+  .dprevitem { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .dprevgrid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .muted { color: #5b6472; font-size: 12px; }
+  .ftpbtn { background: #2a3550; color: #c8d2e3; border: 1px solid #3b4a6b; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; }
+  .ftpbtn:hover { background: #33406a; }
+  .gbtn { background: #2a3550; color: #c8d2e3; border: 1px solid #3b4a6b; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; margin-left: auto; }
+  .gbtn:hover { background: #33406a; }
+  #guideModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1002; }
+  #guideModal .box { position: absolute; left: 12vw; right: 12vw; top: 10vh; bottom: 10vh; background: #12151c; border: 1px solid #2c3444; border-radius: 10px; display: flex; flex-direction: column; }
+  .gsec { padding: 12px 18px; overflow: auto; font-size: 13px; line-height: 1.5; }
+  .gsec h4 { margin: 14px 0 6px; color: #8fa3ff; font-size: 13px; }
+  .gsec ul { margin: 0 0 6px; padding-left: 18px; color: #c8d2e3; }
+  .gsec li { margin: 4px 0; }
+  .gsec code { background: #1c212c; border: 1px solid #2c3444; border-radius: 4px; padding: 1px 5px; font-family: Consolas, monospace; font-size: 12px; }
+  .labsec { margin: 14px 18px; background: #10131a; border: 1px solid #1d232f; border-radius: 10px; padding: 14px; }
+  .labrow { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .labrow input { flex: 1; min-width: 240px; background: #161a22; color: #d8dee9; border: 1px solid #2c3444; border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+  .labrow button { background: #2a3550; color: #c8d2e3; border: 1px solid #3b4a6b; border-radius: 6px; padding: 8px 12px; font-size: 12.5px; cursor: pointer; }
+  .labrow button:hover { background: #33406a; }
+  .labcard { display: grid; grid-template-columns: 130px 1fr 1.4fr; gap: 10px; padding: 8px 10px; border-bottom: 1px dashed #1d232f; font-size: 12.5px; align-items: start; }
+  .labcard.labhead { color: #9aa7bd; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #2c3444; }
+  .labcmd { margin-top: 10px; background: #0d0f14; border: 1px dashed #3b4a6b; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #9aa7bd; }
+  .labcmd code { color: #7ddfa0; font-family: Consolas, monospace; word-break: break-all; }
+</style>
+</head>
+<body>
+<header>
+  <h1>netscanner · panel en vivo</h1>
+  <span id="status">conectando…</span>
+  <span class="conn" id="mConn">mi conexión: consultando…</span>
+  <span class="stat">registros: <b id="cTotal">0</b></span>
+  <span class="stat">IPs únicas: <b id="cIPs">0</b></span>
+  <span class="stat">actualizado: <b id="cTime">–</b></span>
+  <button class="gbtn" id="guideBtn">❓ Guía rápida</button>
+</header>
+<div id="guideModal"><div class="box">
+  <div class="mhead"><b>❓ Guía rápida · qué se puede y qué no</b><button id="gClose">✕</button></div>
+  <div class="gsec scroll">
+    <h4>🕶️ Anonimato al escanear</h4>
+    <ul>
+      <li><b>Tu MAC y tu hardware nunca salen de tu red</b>: la MAC se queda en el router de tu casa; internet solo ve tu IP pública. No se puede "ver tu MAC" desde afuera, ni se envía información de hardware (el scanner usa User-Agent neutro de navegador, no "NetScanner").</li>
+      <li><b>Para ocultar tu IP</b> usa el flag <code>--proxy socks5://127.0.0.1:9050</code> (TOR) o una VPN. El escáner rutea TODAS las conexiones por el proxy (flag <code>--proxy</code> del panel para navegación y listado FTP).</li>
+      <li><b>Ojo</b>: por TOR el escaneo masivo es lentísimo y muchos servidores bloquean nodos TOR; para trabajos grandes conviene una VPN.</li>
+    </ul>
+    <h4>📂 Sobre FTP anónimo y archivos abiertos</h4>
+    <ul>
+      <li>El FTP anónimo <b>ya casi no existe expuesto en internet</b>: los routers bloquean el puerto 21 y los servidores lo deshabilitan. Es normal no encontrar ninguno en un ISP. Lo que sí abunda: <b>listados web "Index of"</b>, WebDAV y archivos en servidores mal configurados.</li>
+      <li>La detección del scanner está verificada (FTP anónimo, WebDAV, NAS, snapshots de cámara) con servidores de prueba. Si no ves hallazgos, es porque la red escaneada no los tiene.</li>
+    </ul>
+    <h4>🎥 Sobre cámaras</h4>
+    <ul>
+      <li>Las cámaras se detectan por puerto 554 (RTSP) o por su página web (título Hikvision/Dahua/XMeye…). Solo las que sirven web <b>sin login</b> pueden mostrar un snapshot; las demás piden credenciales (las cámaras con usuario/contraseña por defecto existen pero entrar sin autorización es ilegal).</li>
+    </ul>
+    <h4>🔬 Otros ISP, otras IPs, dominios</h4>
+    <ul>
+      <li>El panel incluye un <b>laboratorio</b>: poné un dominio o una IP y te muestra la IP real (DNS), su ISP/ciudad (ip-api) y sus puertos/servicios públicos indexados por <b>Shodan</b> — sin escanear nada, 100% legal.</li>
+      <li>Para escanear un rango ajeno necesitás saber sus IPs: podés pedirle a una <b>guía de direcciones de tu zona</b> o consultar el ASN del operador (p.ej. <code>whois</code>). Escanear redes de terceros <b>sin autorización es ilegal en Argentina</b> (acceso ilegítimo a sistemas). Con autorización o en tu red, adelante.</li>
+    </ul>
+    <h4>🧪 Laboratorio (abajo)</h4>
+    <ul>
+      <li>Escribí una IP o dominio → <b>consultar</b>: resuelve DNS, muestra ISP/ciudad y lo que Shodan indexa públicamente (puertos y servicios).</li>
+      <li>El botón <b>comando para escanear</b> te prepara el comando exacto de <code>netscanner.exe</code> para esa IP.</li>
+    </ul>
+  </div>
+</div></div>
+<div class="labsec">
+  <div class="maphead">
+    <div>
+      <h2>🔬 Laboratorio · consultar cualquier IP o dominio</h2>
+      <div class="sub">DNS → ISP/ciudad (ip-api) → servicios públicos indexados (Shodan, sin escanear)</div>
+    </div>
+  </div>
+  <div class="labrow">
+    <input id="labIn" type="text" spellcheck="false" placeholder="ej: 45.226.10.2  o  ejemplo.com.ar">
+    <button id="labGo">🔍 consultar</button>
+    <button id="labCmd">⚡ comando para escanear</button>
+  </div>
+  <div id="labOut"></div>
+  <div id="labCmdOut"></div>
+</div>
+<div id="prog">
+  <div class="row">
+    <span>progreso: <b id="pPct">0%</b></span>
+    <span>sondeos: <b id="pDone">0</b> / <b id="pTotal">0</b></span>
+    <span>tasa: <b id="pRate">–</b></span>
+    <span>ETA: <b id="pEta">–</b></span>
+    <span>transcurrido: <b id="pElapsed">–</b></span>
+    <span>abiertos: <b id="pOpen">0</b></span>
+    <span>timeouts: <b id="pTimeout">0</b></span>
+    <span>errores: <b id="pErr">0</b></span>
+  </div>
+  <div class="bar"><div id="pBar"></div></div>
+  <div class="rate-spark"><svg id="pSpark" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
+</div>
+<div class="cards">
+  <div class="card"><div class="v" id="sTotal">0</div><div class="k">Puertos abiertos</div></div>
+  <div class="card"><div class="v" id="sIPs">0</div><div class="k">Dispositivos</div></div>
+  <div class="card"><div class="v" id="sWeb">0</div><div class="k">Servidores web</div></div>
+  <div class="card"><div class="v" id="sCam">0</div><div class="k">Cámaras (554)</div></div>
+  <div class="card"><div class="v" id="sIdx">0</div><div class="k">Listados de archivos</div></div>
+  <div class="card"><div class="v" id="sHttp">0</div><div class="k">HTTP 200</div></div>
+</div>
+<div class="findings">
+  <div class="maphead">
+    <div>
+      <h2>⚠️ Hallazgos y exposición</h2>
+      <div class="sub">Dispositivos con mayor riesgo: listados de archivos, cámaras, logins y muchos servicios abiertos · clic en la IP abre la ficha</div>
+    </div>
+  </div>
+  <div id="findList"></div>
+</div>
+<div class="mapsec">
+  <div class="maphead">
+    <div>
+      <h2>🗺️ Mapa · ciudad y rangos del proveedor</h2>
+      <div class="sub">Puntos = ciudades geolocalizadas · color del anillo = rango de IP (tu proveedor)</div>
+    </div>
+    <div class="legend" id="mapLegend"></div>
+  </div>
+  <div id="map"></div>
+  <div id="mapMsg">cargando mapa…</div>
+  <div class="rngrow" id="rngCards"></div>
+</div>
+<div class="grid">
+  <div class="chart"><h3>Puertos más abiertos</h3><div class="sub">Distribución de servicios encontrados</div><div id="chPorts"></div></div>
+  <div class="chart"><h3>Tipos de dispositivo</h3><div class="sub">Clasificación automática por banner y título</div><div id="chTypes"></div><div class="legend" id="legTypes"></div></div>
+  <div class="chart"><h3>Rangos con más datos</h3><div class="sub">Subredes /24 con más puertos abiertos (top 8)</div><div id="chRanges"></div></div>
+  <div class="chart"><h3>Respuestas HTTP</h3><div class="sub">Códigos de estado en puertos web</div><div id="chHttp"></div><div class="legend" id="legHttp"></div></div>
+  <div class="chart"><h3>Servidores principales</h3><div class="sub">Encabezados Server: más comunes (top 8)</div><div id="chServers"></div></div>
+  <div class="chart"><h3>Datos encontrados</h3><div class="sub">Resumen de contenido descubierto</div><div class="dlist" id="chData"></div></div>
+  <div class="chart"><h3>⏱️ Timeline de descubrimiento</h3><div class="sub">Puertos e IPs nuevas por minuto durante el escaneo</div><div id="chTime"></div></div>
+  <div class="chart"><h3>🔥 Heatmap rango × puerto</h3><div class="sub">Qué servicio domina en cada rango del proveedor (intensidad = cantidad)</div><div id="chHeat"></div></div>
+  <div class="chart"><h3>🔍 Análisis de contenido</h3><div class="sub">Palabras en títulos y archivos expuestos en listados</div><div id="chWords"></div></div>
+</div>
+<div class="devsec">
+  <h2>🖥️ Dispositivos destacados</h2>
+  <div class="sub">IPs con más servicios y contenido expuesto · botón ver abre el visor</div>
+  <div class="devcards" id="devs"></div>
+</div>
+<div class="controls">
+  <input id="q" type="search" placeholder="buscar por IP, servidor, título, ciudad…">
+  <select id="fPort"><option value="">todos los puertos</option></select>
+  <select id="fHttp"><option value="">cualquier estado</option><option>200</option><option>301</option><option>302</option><option>308</option><option>0</option></select>
+  <select id="fType"><option value="">todos los tipos</option></select>
+  <select id="fRng"><option value="">todos los rangos</option><option value="0">198.51.100.0/21</option><option value="1">198.51.101.0/22</option><option value="2">203.0.113.0/22</option><option value="3">203.0.114.0/22</option><option value="otras">otras</option></select>
+  <select id="fCity"><option value="">todas las ciudades</option></select>
+  <button id="export">⬇ exportar CSV</button>
+  <button id="clear">limpiar vista</button>
+</div>
+<div id="err"></div>
+<table>
+  <thead>
+    <tr><th>hora</th><th>IP</th><th>puerto</th><th>HTTP</th><th>servidor</th><th>título</th><th>ciudad</th><th>geo</th><th>ver</th></tr>
+  </thead>
+  <tbody id="rows"></tbody>
+</table>
+<div id="empty" class="empty">Esperando resultados… ejecuta netscanner y aparecerán aquí en vivo.</div>
+
+<div id="modal"><div class="box">
+  <div class="mhead"><b id="mTitle"></b><button id="mClose">✕</button></div>
+  <div class="mtabs">
+    <button data-t="html">HTML</button>
+    <button data-t="text">Texto</button>
+    <button data-t="img">Fotos</button>
+    <button data-t="links">Enlaces</button>
+    <a id="mOpen" target="_blank" rel="noopener">abrir original ↗</a>
+  </div>
+  <div class="mnav">
+    <input id="mUrl" type="text" spellcheck="false" placeholder="navegar en vivo: http://ip/path… (usa el proxy del panel)">
+    <button id="mBack">←</button>
+    <button id="mGo">ir</button>
+  </div>
+  <div id="mBody"></div>
+</div></div>
+
+<div id="devModal"><div class="box">
+  <div class="mhead"><span id="dTitleIco" style="font-size:22px"></span><b id="dTitle"></b><span id="dRisk"></span><span class="stat" id="dMeta"></span><button id="dClose">✕</button></div>
+  <div class="dsec"><h4>servicios abiertos</h4><div id="dPorts" class="dservs"></div></div>
+  <div class="dsec"><h4>alertas de exposición</h4><div id="dAlerts" class="dbadges"></div></div>
+  <div class="dsec"><h4>vista previa automática</h4><div id="dPrev" class="dprev"></div></div>
+  <div class="dsec scroll"><h4>servicios y contenido</h4><div id="dServs"></div></div>
+  <div class="dsec scroll"><h4>archivos listados</h4><div id="dFiles" class="dfiles"></div></div>
+</div></div>
+
+<script>
+"use strict";
+const state = { records: [], portOptions: new Set(), viewer: null, map: null, myip: null };
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fmtK(n) {
+  return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(n);
+}
+function tag(p) {
+  if (p === 80) return '<span class="tag w80">80</span>';
+  if (p === 443) return '<span class="tag w443">443</span>';
+  if (p === 554) return '<span class="tag w554">554</span>';
+  return '<span class="tag other">' + p + "</span>";
+}
+function classify(r) {
+  const b = r.banner || {};
+  const s = (b.server || "").toLowerCase();
+  const t = (b.title || "").toLowerCase();
+  const body = (b.body || "").toLowerCase();
+  if (b.ftp_auth === "anonymous") return "FTP anónimo";
+  if (b.dav) return "WebDAV expuesto";
+  if (t.includes("diskstation") || t.includes("synology") || t.includes("qnap") || t.includes("terramaster") || t.includes("buffalo") || t.includes("wd mycloud") || t.includes("mycloud") || t.includes("file manager") || t.includes("web file") || t.includes("nas") || t.includes("smb")) return "NAS / almacenamiento";
+  if (s.includes("cambium") || t.includes("epmp")) return "Radio WISP";
+  if (s.includes("mikrotik") || t.includes("routeros")) return "Router Mikrotik";
+  if (t.includes("kaon") || s.includes("kaon") || t.includes("cpe") || t.includes("ont") || t.includes("onu")) return "ONT / CPE cliente";
+  if (t.includes("dvr") || t.includes("xmeye") || t.includes("hikvision") || t.includes("netvision") || t.includes("camera") || t.includes("cámara") || t.includes("cam")) return "Cámara / DVR";
+  if (r.port === 554) return "Cámara / DVR";
+  if (body.includes("index of") || body.includes("parent directory")) return "Listado de archivos";
+  if (s.includes("nginx") || s.includes("apache") || s.includes("iis") || s.includes("lighttpd") || s.includes("openresty")) return "Servidor web";
+  if (s.includes("micro_httpd") || s.includes("mini_httpd") || s.includes("boa") || s.includes("thttpd")) return "Dispositivo embebido";
+  if (t.includes("login") || t.includes("router") || t.includes("gateway") || t.includes("admin")) return "Login de dispositivo";
+  if (s) return "Servicio HTTP";
+  return "Puerto TCP abierto";
+}
+const typeColors = {
+  "FTP anónimo": "#ff8f8f", "WebDAV expuesto": "#ffb86b", "NAS / almacenamiento": "#e5c07b",
+  "Radio WISP": "#9db6ff", "Router Mikrotik": "#d3a0ff", "ONT / CPE cliente": "#7ddfa0",
+  "Cámara / DVR": "#ffb86b", "Listado de archivos": "#ff8f8f", "Servidor web": "#5b7cfa",
+  "Dispositivo embebido": "#e5c07b", "Login de dispositivo": "#56b6c2", "Servicio HTTP": "#6c7aa8",
+  "Puerto TCP abierto": "#4a5878"
+};
+const typeIcons = {
+  "FTP anónimo": "📂", "WebDAV expuesto": "🗄️", "NAS / almacenamiento": "🗄️",
+  "Radio WISP": "📡", "Router Mikrotik": "🧠", "ONT / CPE cliente": "🔌",
+  "Cámara / DVR": "🎥", "Listado de archivos": "📂", "Servidor web": "🖥️",
+  "Dispositivo embebido": "⚙️", "Login de dispositivo": "🔐", "Servicio HTTP": "🌐",
+  "Puerto TCP abierto": "🔓"
+};
+function typeIcon(t) { return typeIcons[t] || "🌐"; }
+function portIcon(p) {
+  if (p === 554) return "🎥";
+  if (p === 21 || p === 22 || p === 23) return "⌨️";
+  if (p === 25 || p === 110 || p === 143) return "📧";
+  if (p === 53) return "🧭";
+  if (p === 443) return "🔒";
+  if (p === 80 || p === 8080 || p === 8000 || p === 81 || p === 8888) return "🌐";
+  return "⚙️";
+}
+function riskScore(d) {
+  let sc = d.idx * 50 + d.cams * 40 + d.logins * 25 + d.ftp * 50 + d.dav * 45;
+  if (d.portsA.length >= 4) sc += 10;
+  if (d.portsA.length >= 7) sc += 10;
+  if (d.titles) sc += 2;
+  if (d.imgs) sc += 2;
+  return Math.min(100, sc);
+}
+function riskBadge(sc) {
+  if (sc >= 70) return '<span class="risk risk-high">🔴 ' + sc + " alto</span>";
+  if (sc >= 40) return '<span class="risk risk-med">🟠 ' + sc + " medio</span>";
+  return '<span class="risk risk-low">🟢 ' + sc + " bajo</span>";
+}
+function parseFiles(body) {
+  const d = document.createElement("div");
+  d.innerHTML = body || "";
+  const out = [];
+  for (const a of d.querySelectorAll("a[href]")) {
+    const name = decodeURIComponent((a.textContent || a.getAttribute("href") || "").trim());
+    if (!name || name === "../" || name === "../..") continue;
+    if (name.endsWith("/") || (a.getAttribute("href") || "").endsWith("/")) { out.push({ name, dir: true }); continue; }
+    out.push({ name, dir: false });
+    if (out.length >= 80) break;
+  }
+  return out;
+}
+function fileCat(name) {
+  const m = /\.([a-z0-9]{1,6})$/i.exec(name);
+  const ext = m ? m[1].toLowerCase() : "";
+  if (ext === "jpg" || ext === "jpeg" || ext === "png" || ext === "gif" || ext === "bmp" || ext === "webp") return "🖼️ imagen";
+  if (ext === "mp4" || ext === "avi" || ext === "mkv" || ext === "ts" || ext === "mov" || ext === "flv" || ext === "3gp") return "🎬 video";
+  if (ext === "bin" || ext === "img" || ext === "fw" || ext === "pkg" || ext === "upg") return "📦 firmware";
+  if (ext === "conf" || ext === "cfg" || ext === "ini" || ext === "xml" || ext === "json" || ext === "bak" || ext === "sav") return "⚙️ config";
+  if (ext === "pdf" || ext === "doc" || ext === "txt" || ext === "log" || ext === "html") return "📄 documento";
+  if (ext === "zip" || ext === "tar" || ext === "gz" || ext === "rar" || ext === "7z") return "🗜️ comprimido";
+  if (ext) return "🗂️ " + ext;
+  return "📄 archivo";
+}
+function shortName(n) { return n.length > 34 ? n.slice(0, 31) + "…" : n; }
+function parseDAV(body) {
+  const out = [];
+  const re = /<d:href>([^<]+)<\/d:href>/gi;
+  let m;
+  while ((m = re.exec(body || "")) && out.length < 80) {
+    const p = m[1];
+    if (p && p !== "/") out.push({ name: p, dir: p.endsWith("/") });
+  }
+  return out;
+}
+function deviceMap() {
+  const byIp = {};
+  for (const r of state.records) {
+    const b = r.banner || {}, g = r.geo || {};
+    let d = byIp[r.ip];
+    if (!d) d = byIp[r.ip] = { ip: r.ip, recs: [], ports: new Set(), types: {}, city: g.city || "", isp: g.isp || "", idx: 0, imgs: 0, titles: 0, cams: 0, logins: 0, ftp: 0, dav: 0, files: [], view: null, ftpPorts: [] };
+    d.recs.push(r);
+    d.ports.add(r.port);
+    const t = classify(r);
+    d.types[t] = (d.types[t] || 0) + 1;
+    if (b.ftp_auth === "anonymous") { d.ftp++; d.ftpPorts.push(r.port); }
+    if (b.dav) d.dav++;
+    const body = (b.body || "").toLowerCase();
+    if (body.includes("index of") || body.includes("parent directory")) { d.idx++; d.files.push(...parseFiles(b.body)); }
+    if (b.dav && b.dav_body) d.files.push(...parseDAV(b.dav_body));
+    if (body.includes("<img")) d.imgs++;
+    if (b.title) d.titles++;
+    if (r.port === 554) d.cams++;
+    if (t === "Login de dispositivo") d.logins++;
+    if (!d.view && b.http && (b.status_code > 0 || b.body)) d.view = { ip: r.ip, port: r.port };
+  }
+  for (const d of Object.values(byIp)) {
+    d.portsA = [...d.ports].sort((a, b) => a - b);
+    d.topType = Object.entries(d.types).sort((a, b) => b[1] - a[1])[0][0];
+    d.risk = riskScore(d);
+  }
+  return byIp;
+}
+
+const ISP_RANGES = [
+  { name: "198.51.100.0/21", color: "#9db6ff", a: [190, 14, 144], len: 21 },
+  { name: "198.51.101.0/22", color: "#7ddfa0", a: [190, 107, 172], len: 22 },
+  { name: "203.0.113.0/22", color: "#ffb86b", a: [45, 226, 8], len: 22 },
+  { name: "203.0.114.0/22", color: "#d3a0ff", a: [179, 48, 252], len: 22 }
+];
+function ipToInt(ip) {
+  const p = (ip || "").split(".").map(Number);
+  if (p.length !== 4 || p.some(x => !Number.isFinite(x))) return null;
+  return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
+}
+function rngIndex(ip) {
+  const n = ipToInt(ip);
+  if (n == null) return -1;
+  for (let i = 0; i < ISP_RANGES.length; i++) {
+    const r = ISP_RANGES[i];
+    const base = ((r.a[0] << 24) | (r.a[1] << 16) | (r.a[2] << 8)) >>> 0;
+    const bits = 32 - r.len;
+    if ((n >>> bits) === (base >>> bits)) return i;
+  }
+  return -1;
+}
+
+function stats() {
+  const s = { total: state.records.length, ips: new Set(), web: 0, cam: 0, http200: 0, idx: 0, ports: {}, http: {}, servers: {}, types: {}, ranges: {}, titles: 0, withImgs: 0, withLinks: 0, redirects: 0 };
+  for (const r of state.records) {
+    const b = r.banner || {}, g = r.geo || {};
+    s.ips.add(r.ip);
+    s.ports[r.port] = (s.ports[r.port] || 0) + 1;
+    const ip4 = (r.ip || "").split(".");
+    if (ip4.length === 4) { const k = ip4.slice(0, 3).join(".") + ".x"; s.ranges[k] = (s.ranges[k] || 0) + 1; }
+    const code = b.http ? b.status_code || 0 : null;
+    if (code !== null) { s.http[code] = (s.http[code] || 0) + 1; if (code === 200) s.http200++; if (code === 301 || code === 302 || code === 308 || code === 307) s.redirects++; }
+    if (b.http) s.web++;
+    if (r.port === 554) s.cam++;
+    const body = b.body || "";
+    if (body.toLowerCase().includes("index of") || body.toLowerCase().includes("parent directory")) s.idx++;
+    if (b.title) s.titles++;
+    if (body.toLowerCase().includes("<img")) s.withImgs++;
+    if (body.toLowerCase().includes("<a ")) s.withLinks++;
+    const tp = classify(r);
+    s.types[tp] = (s.types[tp] || 0) + 1;
+    if (b.server) s.servers[b.server] = (s.servers[b.server] || 0) + 1;
+    state.portOptions.add(r.port);
+  }
+  return s;
+}
+function barRows(map, colorFn, max, top) {
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, top || 10);
+  if (!entries.length) return '<div class="empty">sin datos aún</div>';
+  const m = max || entries[0][1];
+  return entries.map(([k, v]) =>
+    '<div class="crow"><span class="lbl" title="' + esc(k) + '">' + esc(k) + "</span>" +
+    '<span class="trk"><span class="fill" style="width:' + Math.round(v / m * 100) + "%;background:" + colorFn(k) + '"></span></span>' +
+    '<span class="cnt">' + fmtK(v) + "</span></div>"
+  ).join("");
+}
+function bars(el, map, colorFn, max, top) {
+  $(el).innerHTML = barRows(map, colorFn, max, top);
+}
+function buildCharts() {
+  const s = stats();
+  $("cTotal").textContent = fmtK(state.records.length);
+  $("sTotal").textContent = fmtK(s.total);
+  $("sIPs").textContent = fmtK(s.ips.size);
+  $("cIPs").textContent = fmtK(s.ips.size);
+  $("sWeb").textContent = fmtK(s.web);
+  $("sCam").textContent = fmtK(s.cam);
+  $("sIdx").textContent = fmtK(s.idx);
+  $("sHttp").textContent = fmtK(s.http200);
+  $("empty").style.display = s.total ? "none" : "block";
+
+  bars("chPorts", s.ports, p => ({ 80: "#9db6ff", 443: "#7ddfa0", 554: "#ffb86b", 8080: "#d3a0ff", 8000: "#d3a0ff" }[p] || "#6c7aa8"));
+  bars("chTypes", s.types, t => typeColors[t] || "#4a5878", null, 8);
+  $("legTypes").innerHTML = Object.entries(s.types).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t]) =>
+    '<span style="color:' + (typeColors[t] || "#4a5878") + '">' + typeIcon(t) + " " + esc(t) + "</span>").join("");
+  bars("chRanges", s.ranges, () => "#ffb86b", null, 8);
+  bars("chHttp", s.http, c => ({ 200: "#7ddfa0", 301: "#e5c07b", 302: "#e5c07b", 308: "#9db6ff", 307: "#e5c07b" }[c] || "#6c7aa8"));
+  $("legHttp").innerHTML = '<span style="color:#7ddfa0">200 ok</span><span style="color:#9db6ff">308 redirect</span><span style="color:#e5c07b">301/302</span><span style="color:#6c7aa8">otros</span>';
+  bars("chServers", s.servers, () => "#5b7cfa", null, 8);
+  $("chData").innerHTML = [
+    ["Dispositivos (IPs únicas)", s.ips.size],
+    ["Puertos abiertos", s.total],
+    ["Servidores web (HTTP)", s.web],
+    ["Páginas con título", s.titles],
+    ["Páginas con imágenes", s.withImgs],
+    ["Páginas con enlaces", s.withLinks],
+    ["Listados de archivos (Index of)", s.idx],
+    ["HTTP 200 (contenido)", s.http200],
+    ["Redirecciones (301/302/307/308)", s.redirects],
+    ["Cámaras RTSP (554)", s.cam]
+  ].map(([k, v]) => '<div class="drow"><span>' + k + '</span><b>' + fmtK(v) + "</b></div>").join("");
+}
+function filtered() {
+  const q = $("q").value.trim().toLowerCase();
+  const fp = $("fPort").value;
+  const fh = $("fHttp").value;
+  const ft = $("fType").value;
+  const fr = $("fRng").value;
+  const fc = $("fCity").value;
+  return state.records.filter(r => {
+    if (fp && r.port !== Number(fp)) return false;
+    if (fh !== "" && String(r.banner && r.banner.status_code || 0) !== fh) return false;
+    if (ft && classify(r) !== ft) return false;
+    if (fr) {
+      const ri = rngIndex(r.ip);
+      if (fr === "otras") { if (ri >= 0) return false; }
+      else if (ri !== Number(fr)) return false;
+    }
+    if (fc && (r.geo && r.geo.city || "") !== fc) return false;
+    if (!q) return true;
+    const hay = [r.ip, r.banner && r.banner.server, r.banner && r.banner.title, r.geo && r.geo.city, r.geo && r.geo.country, r.geo && r.geo.isp, r.banner && r.banner.body].join(" ").toLowerCase();
+    return hay.includes(q);
+  });
+}
+let timer = null;
+function render() {
+  if (timer) return;
+  timer = setTimeout(() => { timer = null; paint(); }, 150);
+}
+function paint() {
+  state.devMap = deviceMap();
+  buildCharts();
+  buildDevices(state.devMap);
+  buildFindings(state.devMap);
+  buildMap();
+  buildRanges();
+  buildTimeline();
+  buildHeat();
+  buildWords();
+  $("cTime").textContent = new Date().toLocaleTimeString();
+  const sel = $("fPort");
+  const cur = sel.value;
+  const opts = [...state.portOptions].sort((a, b) => a - b);
+  if (sel.options.length - 1 !== opts.length || !cur) {
+    sel.innerHTML = '<option value="">todos los puertos</option>' + opts.map(p => '<option>' + p + "</option>").join("");
+    sel.value = cur || "";
+  }
+  const ftSel = $("fType");
+  const curT = ftSel.value;
+  const tOpts = [...new Set(state.records.map(r => classify(r)))].sort();
+  if (ftSel.options.length - 1 !== tOpts.length || !curT) {
+    ftSel.innerHTML = '<option value="">todos los tipos</option>' + tOpts.map(t => '<option>' + esc(t) + "</option>").join("");
+    if (tOpts.includes(curT)) ftSel.value = curT;
+  }
+  const fcSel = $("fCity");
+  const curC = fcSel.value;
+  const cOpts = [...new Set(state.records.map(r => (r.geo && r.geo.city || "")).filter(Boolean))].sort();
+  if (fcSel.options.length - 1 !== cOpts.length || !curC) {
+    fcSel.innerHTML = '<option value="">todas las ciudades</option>' + cOpts.map(c => '<option>' + esc(c) + "</option>").join("");
+    if (cOpts.includes(curC)) fcSel.value = curC;
+  }
+  const tb = $("rows");
+  let html = "";
+  for (const r of filtered()) {
+    const b = r.banner || {}, g = r.geo || {};
+    const viewable = b.http && (b.status_code > 0 || b.body);
+    const type = classify(r);
+    html += "<tr data-raw=\"" + esc(b.raw || "") + "\">" +
+      "<td>" + esc((r.timestamp || "").slice(11, 19)) + "</td>" +
+      "<td><span class=\"ipbtn\" data-ip=\"" + esc(r.ip) + "\">" + esc(r.ip) + "</span></td>" +
+      "<td>" + tag(r.port) + "</td>" +
+      "<td class=\"code\">" + (b.http ? esc(b.status_code || 0) : "–") + "</td>" +
+      "<td>" + esc(b.server) + "</td>" +
+      "<td>" + esc(b.title) + '<span class="chip">' + typeIcon(type) + " " + esc(type) + "</span></td>" +
+      "<td>" + esc(g.city) + "</td>" +
+      "<td>" + esc(g.label) + "</td>" +
+      "<td>" + (viewable ? '<span class="vbtn" data-ip="' + esc(r.ip) + '" data-port="' + r.port + '">ver</span>' : "") + "</td></tr>";
+  }
+  tb.innerHTML = html || '<tr><td colspan="9" class="empty">sin coincidencias con los filtros</td></tr>';
+}
+document.addEventListener("click", e => {
+  const vb = e.target.closest(".vbtn");
+  if (vb) { openViewer(vb.dataset.ip, Number(vb.dataset.port)); return; }
+  const ipb = e.target.closest(".ipbtn");
+  if (ipb) { openDev(ipb.dataset.ip); return; }
+  const tr = e.target.closest("tr[data-raw]");
+  if (!tr) return;
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains("detail")) { next.remove(); return; }
+  const d = document.createElement("tr");
+  d.className = "detail";
+  d.innerHTML = "<td colspan=\"9\">" + esc(tr.dataset.raw || "(sin banner crudo)") + "</td>";
+  tr.after(d);
+});
+$("q").addEventListener("input", render);
+$("fPort").addEventListener("change", render);
+$("fHttp").addEventListener("change", render);
+$("fType").addEventListener("change", render);
+$("fRng").addEventListener("change", render);
+$("fCity").addEventListener("change", render);
+$("clear").addEventListener("click", () => { state.records = []; render(); });
+
+function buildDevices(devMap) {
+  const devs = Object.values(devMap);
+  devs.sort((a, b) => (b.portsA.length * 10 + b.idx * 60 + b.cams * 40 + b.imgs * 5) - (a.portsA.length * 10 + a.idx * 60 + a.cams * 40 + a.imgs * 5));
+  const top = devs.slice(0, 10);
+  if (!top.length) { $("devs").innerHTML = '<div class="empty">sin dispositivos aún</div>'; return; }
+  $("devs").innerHTML = top.map(d => {
+    const badges = [];
+    if (d.ftp) badges.push('<span class="dbadge hot">📂 FTP anónimo</span>');
+    if (d.dav) badges.push('<span class="dbadge hot">🗄️ WebDAV</span>');
+    if (d.idx) badges.push('<span class="dbadge hot">📂 ' + d.idx + " listado" + (d.idx > 1 ? "s" : "") + "</span>");
+    if (d.cams) badges.push('<span class="dbadge hot">🎥 ' + d.cams + " cámara" + (d.cams > 1 ? "s" : "") + "</span>");
+    if (d.titles) badges.push('<span class="dbadge good">📄 ' + d.titles + " título" + (d.titles > 1 ? "s" : "") + "</span>");
+    if (d.imgs) badges.push('<span class="dbadge">🖼️ ' + d.imgs + " imágen" + (d.imgs > 1 ? "es" : "") + "</span>");
+    const servs = d.portsA.map(p => '<span class="dserv">' + portIcon(p) + " " + p + "</span>").join("");
+    const ver = d.view ? '<button class="vbtn" data-ip="' + esc(d.ip) + '" data-port="' + d.view.port + '">ver</button>' : "";
+    return '<div class="devcard"><div class="top"><span class="dicon">' + typeIcon(d.topType) + "</span><div>" +
+      '<div class="ip"><span class="ipbtn" data-ip="' + esc(d.ip) + '">' + esc(d.ip) + "</span></div>" +
+      '<div class="meta">' + esc(d.city) + (d.isp ? " · " + esc(d.isp) : "") + "</div></div>" + riskBadge(d.risk) + "</div>" +
+      '<div class="dservs">' + servs + "</div>" +
+      '<div class="dbadges">' + (badges.join("") || '<span class="dbadge">' + esc(d.topType) + "</span>") + "</div>" +
+      '<div style="margin-top:6px">' + ver + "</div></div>";
+  }).join("");
+}
+function buildFindings(devMap) {
+  const list = Object.values(devMap).filter(d => d.risk >= 40).sort((a, b) => b.risk - a.risk).slice(0, 15);
+  if (!list.length) { $("findList").innerHTML = '<div class="empty">sin hallazgos de exposición en los datos</div>'; return; }
+  $("findList").innerHTML = list.map(d => {
+    const bits = [];
+    if (d.ftp) bits.push("📂 " + d.ftp + " FTP anónimo");
+    if (d.dav) bits.push("🗄️ " + d.dav + " WebDAV");
+    if (d.idx) bits.push("📂 " + d.idx + " listado" + (d.idx > 1 ? "s" : ""));
+    if (d.cams) bits.push("🎥 " + d.cams + " cámara" + (d.cams > 1 ? "s" : ""));
+    if (d.logins) bits.push("🔐 login");
+    if (d.portsA.length >= 4) bits.push("⚙️ " + d.portsA.length + " puertos");
+    if (d.imgs) bits.push("🖼️ " + d.imgs + " imágen" + (d.imgs > 1 ? "es" : ""));
+    const snapPort = d.cams ? webPortOf(d) : null;
+    const limgs = listingImgs(d, 1);
+    const thumb = snapPort ? '<img class="fthumb" data-snap="' + esc(d.ip) + ":" + snapPort + '" alt="🎥">' :
+      (limgs.length ? '<img class="fthumb" src="/proxy?u=' + encodeURIComponent(limgs[0]) + '" onerror="this.remove()" alt="📂">' : "");
+    return '<div class="frow"><span class="dicon">' + typeIcon(d.topType) + '</span>' +
+      '<span class="ip"><span class="ipbtn" data-ip="' + esc(d.ip) + '">' + esc(d.ip) + "</span></span>" +
+      '<span class="desc">' + esc(d.city || "—") + " · " + bits.join(" · ") + '</span>' +
+      thumb + '<span class="r">' + riskBadge(d.risk) + "</span></div>";
+  }).join("");
+  primeThumbs();
+}
+function primeThumbs() {
+  document.querySelectorAll("img.fthumb[data-snap]").forEach(img => {
+    const [ip, port] = img.dataset.snap.split(":");
+    trySnapshots(camSnapshotUrls(ip, +port), u => { if (u) img.src = "/proxy?u=" + encodeURIComponent(u); else img.remove(); });
+  });
+}
+function buildTimeline() {
+  const el = $("chTime");
+  const buckets = new Map();
+  for (const r of state.records) {
+    const t = (r.timestamp || "").slice(0, 16);
+    if (!t || t.length < 16) continue;
+    if (!buckets.has(t)) buckets.set(t, { ports: 0, ips: new Set() });
+    const b = buckets.get(t);
+    b.ports++;
+    b.ips.add(r.ip);
+  }
+  const arr = [...buckets.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1);
+  if (arr.length < 2) {
+    el.innerHTML = '<div class="empty">se necesitan al menos 2 minutos de escaneo para graficar el timeline</div>';
+    return;
+  }
+  const W = 400, H = 90;
+  const max = Math.max(...arr.map(([, b]) => Math.max(b.ports, b.ips.size)), 1);
+  const px = i => i / (arr.length - 1) * W;
+  const line = (get) => arr.map(([, b], i) => px(i) + "," + (H - get(b) / max * H)).join(" ");
+  el.innerHTML = '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" style="width:100%;height:90px;background:#10131a;border-radius:4px;border:1px solid #1d232f">' +
+    '<polyline points="' + line(b => b.ports) + '" fill="none" stroke="#5b7cfa" stroke-width="2"/>' +
+    '<polyline points="' + line(b => b.ips.size) + '" fill="none" stroke="#7ddfa0" stroke-width="2"/></svg>' +
+    '<div class="legend"><span style="color:#5b7cfa">puertos/minuto</span><span style="color:#7ddfa0">IPs nuevas/minuto</span><span>' + arr[0][0].slice(11) + " → " + arr[arr.length - 1][0].slice(11) + " · " + arr.length + " min</span></div>";
+}
+function buildHeat() {
+  const rows = ISP_RANGES.map(r => ({ name: r.name, color: r.color, cells: {} }));
+  const otherRow = { name: "otras", color: "#6c7aa8", cells: {} };
+  const portOrder = [80, 443, 8080, 8000, 554, 21, 22];
+  for (const r of state.records) {
+    const ri = rngIndex(r.ip);
+    const row = ri >= 0 ? rows[ri] : otherRow;
+    const key = portOrder.includes(r.port) ? r.port : "otro";
+    row.cells[key] = (row.cells[key] || 0) + 1;
+  }
+  const all = [...rows, otherRow];
+  const max = Math.max(...all.map(r => Math.max(...Object.values(r.cells), 1)), 1);
+  let html = '<div class="heatrow heathead"><span>rango \\ puerto</span>' + portOrder.map(p => "<span>" + p + "</span>").join("") + "<span>otro</span><span>total</span></div>";
+  for (const row of all) {
+    const total = Object.values(row.cells).reduce((a, b) => a + b, 0);
+    html += '<div class="heatrow"><span style="color:' + row.color + '">' + row.name + "</span>";
+    for (const p of [...portOrder, "otro"]) {
+      const v = row.cells[p] || 0;
+      const alpha = v ? (0.16 + 0.84 * (v / max)).toFixed(2) : 0;
+      html += '<span style="background:' + row.color + ";opacity:" + alpha + '" title="' + p + ": " + v + '">' + (v ? fmtK(v) : "") + "</span>";
+    }
+    html += "<span><b>" + fmtK(total) + "</b></span></div>";
+  }
+  $("chHeat").innerHTML = html;
+}
+function buildWords() {
+  const stop = new Set(["the", "a", "an", "of", "to", "in", "for", "and", "or", "de", "la", "el", "del", "en", "con", "para", "por", "default", "welcome", "page", "login", "system", "home", "panel", "web", "server", "management", "config", "admin", "bienvenido", "kfs", "mgmt", "none"]);
+  const words = {};
+  for (const r of state.records) {
+    const t = (r.banner && r.banner.title || "").replace(/-/g, " ");
+    if (!t) continue;
+    for (const w of t.split(/[^a-záéíóúñ0-9]+/i)) {
+      const k = w.toLowerCase();
+      if (k.length < 3 || stop.has(k) || /^\d+$/.test(k)) continue;
+      words[k] = (words[k] || 0) + 1;
+    }
+  }
+  const cats = {};
+  for (const r of state.records) {
+    const b = r.banner && r.banner.body || "";
+    if (!/index of|parent directory/i.test(b)) continue;
+    const d = document.createElement("div");
+    d.innerHTML = b;
+    for (const a of d.querySelectorAll("a[href]")) {
+      const name = (a.textContent || a.getAttribute("href") || "").trim();
+      if (!name || name === "../" || name === "../..") continue;
+      if (name.endsWith("/") || (a.getAttribute("href") || "").endsWith("/")) { cats["📁 directorio"] = (cats["📁 directorio"] || 0) + 1; continue; }
+      const c = fileCat(name);
+      cats[c] = (cats[c] || 0) + 1;
+    }
+  }
+  $("chWords").innerHTML =
+    '<div class="wcol"><h4>palabras en títulos</h4>' + barRows(words, () => "#d3a0ff", null, 8) + "</div>" +
+    '<div class="wcol"><h4>archivos en listados</h4>' + barRows(cats, () => "#ffb86b", null, 8) + "</div>";
+}
+
+function buildRanges() {
+  const rng = ISP_RANGES.map(r => ({ name: r.name, color: r.color, ips: new Set(), ports: 0, types: {} }));
+  let other = { ips: new Set(), ports: 0 };
+  for (const r of state.records) {
+    const i = rngIndex(r.ip);
+    const t = classify(r);
+    if (i >= 0) { rng[i].ips.add(r.ip); rng[i].ports++; rng[i].types[t] = (rng[i].types[t] || 0) + 1; }
+    else { other.ips.add(r.ip); other.ports++; }
+  }
+  const cards = rng.map(r => {
+    const topT = Object.entries(r.types).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) =>
+      '<span class="dbadge" style="color:' + (typeColors[t] || "#9aa7bd") + '">' + typeIcon(t) + " " + t + " x" + n + "</span>").join("");
+    return '<div class="rngcard" style="border-left-color:' + r.color + '">' +
+      '<div class="n">' + r.name + "</div>" +
+      '<div class="m">' + fmtK(r.ips.size) + " dispositivos · " + fmtK(r.ports) + " puertos</div>" +
+      '<div class="chips">' + topT + "</div></div>";
+  }).join("");
+  const total = other.ips.size;
+  $("rngCards").innerHTML = cards + '<div class="rngcard" style="border-left-color:#6c7aa8"><div class="n">otras</div>' +
+    '<div class="m">' + fmtK(total) + " dispositivos · " + fmtK(other.ports) + " puertos</div></div>";
+  $("mapLegend").innerHTML = ISP_RANGES.map(r =>
+    '<span style="color:' + r.color + '">' + r.name + "</span>").join("") + '<span style="color:#6c7aa8">otras</span>';
+}
+
+function addMyIPLayer(map) {
+  if (!state.myip || !state.myip.lat || !state.myip.lon) return;
+  L.marker([state.myip.lat, state.myip.lon], {
+    icon: L.divIcon({ className: "", html: '<div style="font-size:22px;text-align:center">🏠</div>', iconSize: [28, 28], iconAnchor: [14, 14] })
+  }).addTo(map).bindPopup("<b>🏠 Mi conexión</b><br>" + esc(state.myip.query) + "<br>" + esc(state.myip.isp || "") + " (" + esc(state.myip.as || "") + ")<br>" + esc(state.myip.city) + ", " + esc(state.myip.regionName) + ", " + esc(state.myip.country));
+  L.circle([state.myip.lat, state.myip.lon], { radius: 15000, color: "#5b7cfa", weight: 1, dashArray: "4 6", fillColor: "#5b7cfa", fillOpacity: 0.05 }).addTo(map);
+}
+function jitterOf(ip) {
+  let h = 2166136261;
+  for (let i = 0; i < ip.length; i++) { h ^= ip.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const ang = (h % 62832) / 10000;
+  const d = ((h >>> 7) % 100) / 100;
+  const R = 0.02 + d * 0.10;
+  return [Math.cos(ang) * R, Math.sin(ang) * R];
+}
+function buildMap() {
+  const msg = $("mapMsg");
+  if (!window.L) {
+    msg.classList.remove("hidden");
+    msg.innerHTML = "mapa no disponible (sin internet para cargar Leaflet)";
+    return;
+  }
+  if (!state.map) {
+    state.map = L.map("map").setView([-31.85, -59.02], 9);
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    });
+    osm.on("tileerror", () => {
+      if (state.fallbackTiles) return;
+      state.fallbackTiles = true;
+      osm.setUrl("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png");
+      osm.setAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>');
+    });
+    osm.addTo(state.map);
+    state.clusters = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 50,
+      iconCreateFunction: cluster => L.divIcon({
+        className: "",
+        html: '<div style="background:#5b7cfa;color:#0f1115;font-weight:700;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;width:38px;height:38px;border:2px solid #8fa3ff">' + cluster.getChildCount() + "</div>",
+        iconSize: [38, 38]
+      })
+    });
+    state.map.addLayer(state.clusters);
+  }
+  const coordOf = {};
+  for (const r of state.records) {
+    const g = r.geo || {};
+    if (g.latitude && g.longitude && !coordOf[r.ip]) coordOf[r.ip] = { lat: g.latitude, lon: g.longitude, city: g.city || "" };
+  }
+  const sig = Object.keys(coordOf).length + ":" + state.records.length;
+  if (state.mapSig === sig && state.mapLast && Date.now() - state.mapLast < 4000) return;
+  state.mapSig = sig;
+  state.mapLast = Date.now();
+  state.map.eachLayer(l => { if (l instanceof L.Circle || l instanceof L.CircleMarker) state.map.removeLayer(l); });
+  state.clusters.clearLayers();
+  const ips = Object.keys(coordOf);
+  if (!ips.length) {
+    msg.classList.remove("hidden");
+    msg.innerHTML = "sin coordenadas en los resultados: al terminar el escaneo se geolocalizan y el mapa se completa solo.<br>Para datos viejos: <code>enrich.exe -in proveedor.jsonl</code>";
+    addMyIPLayer(state.map);
+    if (state.myip && state.myip.lat && state.myip.lon) state.map.setView([state.myip.lat, state.myip.lon], 11);
+    setTimeout(() => state.map.invalidateSize(), 50);
+    return;
+  }
+  msg.classList.add("hidden");
+  for (const ip of ips) {
+    const c = coordOf[ip];
+    const d = state.devMap && state.devMap[ip];
+    const type = d ? d.topType : "Puerto TCP abierto";
+    const ports = d ? d.portsA : [];
+    const ri = rngIndex(ip);
+    const color = ri >= 0 ? ISP_RANGES[ri].color : "#6c7aa8";
+    const [dj, dk] = jitterOf(ip);
+    const mk = L.marker([c.lat + dj, c.lon + dk], {
+      icon: L.divIcon({
+        className: "",
+        html: '<div style="font-size:18px;text-align:center;line-height:22px;border:2px solid ' + color + ';border-radius:50%;background:rgba(15,17,21,.55)">' + typeIcon(type) + "</div>",
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      })
+    });
+    const rngName = ri >= 0 ? ISP_RANGES[ri].name : "otras";
+    const snapPort = d && d.cams ? webPortOf(d) : null;
+    const limgs = d ? listingImgs(d, 1) : [];
+    let pop = "<b>" + typeIcon(type) + " " + esc(ip) + "</b><br>" +
+      esc(c.city || "—") + " · " + esc(rngName) +
+      "<br>" + (ports.length ? ports.map(p => portIcon(p) + " " + p).join(" ") : "") +
+      "<br><span style=\"color:#5b6472\">posición aproximada en el área de la ciudad</span><br>" +
+      '<button class="ipbtn" data-ip="' + esc(ip) + '">📋 ficha</button>';
+    if (d && d.view) pop += ' <button class="vbtn" data-ip="' + esc(ip) + '" data-port="' + d.view.port + '">👁 ver</button>';
+    if (snapPort) pop += '<div class="snap"><img id="snap-' + esc(ip) + '" class="snapimg" alt="🎥 previsualización"><div class="muted">buscando snapshot…</div></div>';
+    else if (limgs.length) pop += '<div class="snap"><img class="snapimg" src="/proxy?u=' + encodeURIComponent(limgs[0]) + '" onerror="this.parentNode.style.display=&#39;none&#39;" alt="📂 archivo"></div>';
+    mk.bindPopup(pop, { maxWidth: 280 });
+    if (snapPort) {
+      mk.on("popupopen", () => {
+        const el = document.getElementById("snap-" + ip);
+        if (!el || el.dataset.done) return;
+        el.dataset.done = "1";
+        trySnapshots(camSnapshotUrls(ip, snapPort), u => {
+          const w = el.parentNode;
+          if (u) { el.src = "/proxy?u=" + encodeURIComponent(u); el.onload = () => el.style.opacity = "1"; }
+          else w.innerHTML = '<div class="muted">sin snapshot público (suele pedir login)</div>';
+        });
+      });
+    }
+    state.clusters.addLayer(mk);
+  }
+  addMyIPLayer(state.map);
+  if (state.myip && state.myip.lat && state.myip.lon) {
+    state.map.setView([state.myip.lat, state.myip.lon], 10);
+  }
+  setTimeout(() => state.map.invalidateSize(), 50);
+}
+function loadScript(src, onload, onerror) {
+  const s = document.createElement("script");
+  s.src = src;
+  s.onload = onload;
+  s.onerror = onerror;
+  document.head.appendChild(s);
+}
+function loadLeaflet() {
+  if (state.leafletLoading) return;
+  state.leafletLoading = true;
+  loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js", () => {
+    loadScript("https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js", () => buildMap(), () => buildMap());
+  }, () => buildMap());
+}
+
+function loadMyIP() {
+  fetch("/myip").then(r => r.ok ? r.json() : null).then(m => {
+    if (!m) { $("mConn").textContent = "mi conexión: no disponible"; return; }
+    state.myip = m;
+    const c = $("mConn");
+    c.innerHTML = "🌐 mi IP <b>" + esc(m.query || "?") + "</b> · " + esc(m.isp || m.org || "?") + " (" + esc(m.as || "?") + ") · " + esc(m.city || "") + ", " + esc(m.countryCode || "");
+    buildMap();
+  }).catch(() => { $("mConn").textContent = "mi conexión: no disponible"; });
+}
+
+$("guideBtn").addEventListener("click", () => { $("guideModal").style.display = "block"; });
+$("gClose").addEventListener("click", () => { $("guideModal").style.display = "none"; });
+$("guideModal").addEventListener("click", e => { if (e.target.id === "guideModal") $("guideModal").style.display = "none"; });
+
+function labQuery() {
+  let raw = $("labIn").value.trim();
+  const demo = !raw;
+  if (demo) raw = "45.226.10.2";
+  const out = $("labOut");
+  out.innerHTML = '<div class="empty">' + (demo ? "campo vacío → consultando ejemplo: <b>45.226.10.2</b> (tu IP pública). Escribí otra IP o dominio y volvé a pulsar." : "consultando…") + "</div>";
+  const isIP = /^\d{1,3}(\.\d{1,3}){3}$/.test(raw);
+  const jobs = [];
+  if (isIP) {
+    jobs.push(Promise.resolve({ kind: "dns", host: raw, ips: [raw] }));
+  } else {
+    jobs.push(fetch("/lookup?host=" + encodeURIComponent(raw)).then(r => r.ok ? r.json() : Promise.reject()).catch(() => ({ kind: "dns", host: raw, ips: [], err: "no resolvió (DNS)" })));
+  }
+  Promise.all(jobs).then(([dns]) => {
+    const ips = dns.ips || [];
+    const cards = [];
+    cards.push('<div class="labcard labhead"><span>IP</span><span>ISP / ciudad</span><span>puertos y servicios públicos (Shodan)</span></div>');
+    let pending = Math.max(ips.length, 1);
+    const fill = () => { pending--; };
+    const rows = ips.map(ip => {
+      const row = document.createElement("div");
+      row.className = "labcard";
+      row.innerHTML = '<span><b>' + esc(ip) + "</b></span><span class=\"muted\">consultando…</span><span class=\"muted\">…</span>";
+      out.appendChild(row);
+      fetch("/iplookup?ip=" + encodeURIComponent(ip)).then(r => r.ok ? r.json() : null).then(g => {
+        row.children[1].innerHTML = (g && g.isp ? esc(g.isp) + (g.as ? " <span class=\"muted\">(" + esc(g.as) + ")</span>" : "") + "<br>" : "") + (g && g.city ? esc(g.city) + (g.countryCode ? ", " + esc(g.countryCode) : "") : "");
+        fill();
+      }).catch(() => fill());
+      fetch("/shodan?ip=" + encodeURIComponent(ip)).then(r => r.ok ? r.json() : null).then(s => {
+        let html = "";
+        if (!s) html = '<span class="muted">sin datos indexados</span>';
+        else {
+          const ports = (s.ports || []).map(p => "<span class=\"dserv\">" + p + "</span>").join(" ");
+          const prod = (s.products || []).slice(0, 5).map(p => esc(p)).join(", ");
+          const cpes = (s.cpes || []).slice(0, 3).join(", ");
+          html = (ports || '<span class="muted">sin puertos</span>') + (prod ? "<br>" + esc(prod) : "") + (cpes ? "<br><span class=\"muted\">" + esc(cpes) + "</span>" : "");
+        }
+        row.children[2].innerHTML = html;
+        fill();
+      }).catch(() => fill());
+      return row;
+    });
+    out.innerHTML = "";
+    out.appendChild(cards[0]);
+    for (const r of rows) out.appendChild(r);
+    if (!ips.length) out.innerHTML = '<div class="empty">' + esc(dns.err || "sin IPs") + "</div>";
+  });
+}
+$("labGo").addEventListener("click", labQuery);
+$("labIn").addEventListener("keydown", e => { if (e.key === "Enter") labQuery(); });
+$("labCmd").addEventListener("click", () => {
+  let raw = $("labIn").value.trim();
+  if (!raw) {
+    raw = "45.226.10.2";
+    $("labCmdOut").innerHTML = '<div class="labcmd">campo vacío → ejemplo con tu IP pública 45.226.10.2:</div>';
+  }
+  const cidr = /^\d{1,3}(\.\d{1,3}){3}$/.test(raw) ? raw + "/32" : raw;
+  const cmd = ".\\netscanner.exe -c " + cidr + " -p 80,443,8080,8000,554,21,22,5000,5001 -o " + (raw.replace(/[^a-z0-9]/gi, "_") || "target") + ".jsonl --proxy socks5://127.0.0.1:9050";
+  $("labCmdOut").innerHTML += "<div class=\"labcmd\">copiá y ejecutá en PowerShell:<br><code>" + esc(cmd) + "</code></div>";
+});
+
+function baseOf(ip, port) {
+  const proto = port === 443 ? "https" : "http";
+  const host = (port === 80 || port === 443) ? ip : ip + ":" + port;
+  return proto + "://" + host + "/";
+}
+function camSnapshotUrls(ip, port) {
+  const base = baseOf(ip, port).replace(/\/$/, "");
+  return [base + "/snapshot.cgi", base + "/cgi-bin/snapshot.cgi", base + "/image.jpg", base + "/cgi-bin/liveimg.cgi", base + "/Streaming/channels/1/picture", base + "/live?snapshot=1", base + "/capture"];
+}
+function trySnapshots(urls, done) {
+  let i = 0;
+  const tryNext = () => {
+    if (i >= urls.length) return done(null);
+    const u = urls[i++];
+    const img = new Image();
+    img.onload = () => done(u);
+    img.onerror = tryNext;
+    img.src = "/proxy?u=" + encodeURIComponent(u);
+  };
+  tryNext();
+}
+function webPortOf(d) {
+  if (d.view) return d.view.port;
+  const r = (d.recs || []).find(r => (r.banner || {}).http && r.banner.status_code > 0);
+  return r ? r.port : null;
+}
+function listingImgs(d, max) {
+  const imgs = [];
+  if (!d || !d.files || !d.view) return imgs;
+  const base = baseOf(d.view.ip, d.view.port);
+  for (const f of d.files) {
+    if (imgs.length >= max) break;
+    if (f.dir || !/\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name)) continue;
+    imgs.push(f.name.startsWith("/") ? base.replace(/\/$/, "") + f.name : base + f.name);
+  }
+  return imgs;
+}
+function openViewer(ip, port) {
+  const base = baseOf(ip, port);
+  $("mTitle").textContent = base;
+  $("mOpen").href = base;
+  $("mUrl").value = base;
+  state.viewer = { base, body: null, loading: true, hist: [] };
+  const rec = state.records.find(r => r.ip === ip && r.port === port);
+  if (rec && rec.banner && rec.banner.body) {
+    state.viewer.body = rec.banner.body;
+    state.viewer.loading = false;
+  } else if (rec && rec.banner && rec.banner.http) {
+    fetch("/proxy?u=" + encodeURIComponent(base)).then(r => r.text()).then(t => {
+      state.viewer.body = t; state.viewer.loading = false; renderViewer();
+    }).catch(() => { state.viewer.body = ""; state.viewer.loading = false; renderViewer(); });
+  } else {
+    state.viewer.body = "";
+    state.viewer.loading = false;
+  }
+  $("modal").style.display = "block";
+  $("mBody").innerHTML = '<div class="empty">cargando…</div>';
+  renderViewer();
+}
+function renderViewer() {
+  const v = state.viewer;
+  if (!v) return;
+  const active = document.querySelector(".mtabs button.active");
+  showTab(active ? active.dataset.t : "html");
+}
+function showTab(t) {
+  const v = state.viewer;
+  document.querySelectorAll(".mtabs button").forEach(b => b.classList.toggle("active", b.dataset.t === t));
+  const body = $("mBody");
+  if (v.loading) { body.innerHTML = '<div class="empty">cargando…</div>'; return; }
+  const html = v.body || "<html><body></body></html>";
+  if (t === "html") {
+    body.innerHTML = '<iframe sandbox="" srcdoc="' + esc(html) + '"></iframe>';
+  } else if (t === "text") {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    body.innerHTML = '<div class="text">' + esc(d.textContent || "") + "</div>";
+  } else if (t === "img" || t === "links") {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    if (t === "img") {
+      const imgs = [...d.querySelectorAll("img")].map(i => new URL(i.getAttribute("src") || "", v.base).href);
+      body.innerHTML = '<div class="gallery">' + (imgs.length ? imgs.map(u =>
+        '<figure><img src="/proxy?u=' + encodeURIComponent(u) + '" loading="lazy"><figcaption>' + esc(u) + "</figcaption></figure>"
+      ).join("") : '<div class="empty">sin imágenes en esta página</div>') + "</div>";
+    } else {
+      const links = [...d.querySelectorAll("a[href]")].map(a => new URL(a.getAttribute("href"), v.base).href);
+      body.innerHTML = '<div class="links">' + (links.length ? links.map(u =>
+        '<a href="/proxy?u=' + encodeURIComponent(u) + '" target="_blank" rel="noopener">' + esc(u) + "</a>"
+      ).join("") : '<div class="empty">sin enlaces en esta página</div>') + "</div>";
+    }
+  }
+}
+document.querySelectorAll(".mtabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.t)));
+$("mClose").addEventListener("click", () => { $("modal").style.display = "none"; });
+$("modal").addEventListener("click", e => { if (e.target.id === "modal") $("modal").style.display = "none"; });
+
+function navTo() {
+  const v = state.viewer;
+  if (!v) return;
+  let u = $("mUrl").value.trim();
+  if (!u) return;
+  if (!/^https?:\/\//i.test(u)) u = "http://" + u;
+  try { const p = new URL(u); u = p.href; } catch (err) { return; }
+  v.hist.push(v.base);
+  if (v.hist.length > 50) v.hist.shift();
+  v.base = u;
+  $("mTitle").textContent = u;
+  $("mOpen").href = u;
+  v.loading = true;
+  v.body = null;
+  renderViewer();
+  fetch("/proxy?u=" + encodeURIComponent(u)).then(r => r.text()).then(t => {
+    if (state.viewer && state.viewer.base === u) { v.body = t; v.loading = false; renderViewer(); }
+  }).catch(() => {
+    if (state.viewer && state.viewer.base === u) { v.body = "<html><body><p>error al cargar " + esc(u) + "</p></body></html>"; v.loading = false; renderViewer(); }
+  });
+}
+$("mGo").addEventListener("click", navTo);
+$("mUrl").addEventListener("keydown", e => { if (e.key === "Enter") navTo(); });
+function navBack() {
+  const v = state.viewer;
+  if (!v || !v.hist.length) return;
+  $("mUrl").value = v.hist.pop();
+  navTo();
+}
+$("mBack").addEventListener("click", navBack);
+
+function openDev(ip) {
+  const d = state.devMap && state.devMap[ip];
+  if (!d) return;
+  $("dTitleIco").textContent = typeIcon(d.topType);
+  $("dTitle").textContent = d.ip;
+  $("dRisk").innerHTML = riskBadge(d.risk);
+  $("dMeta").textContent = [d.city, d.isp].filter(Boolean).join(" · ");
+  $("dPorts").innerHTML = d.portsA.map(p => '<span class="dserv">' + portIcon(p) + " " + p + "</span>").join("");
+  const alerts = [];
+  if (d.ftp) alerts.push("📂 " + d.ftp + " FTP con acceso anónimo");
+  if (d.dav) alerts.push("🗄️ " + d.dav + " WebDAV expuesto (PROPFIND ok)");
+  if (d.idx) alerts.push("📂 " + d.idx + " listado de archivos");
+  if (d.cams) alerts.push("🎥 " + d.cams + " puerto(s) de cámara");
+  if (d.logins) alerts.push("🔐 login de dispositivo expuesto");
+  if (d.portsA.length >= 7) alerts.push("⚙️ muchos servicios abiertos (" + d.portsA.length + ")");
+  if (d.portsA.length >= 4) alerts.push("⚙️ " + d.portsA.length + " servicios activos");
+  $("dAlerts").innerHTML = alerts.length ? alerts.map(a => '<span class="dbadge hot">' + a + "</span>").join("") : '<span class="dbadge good">✅ sin alertas de exposición</span>';
+  $("dServs").innerHTML = d.recs.map(r => {
+    const b = r.banner || {};
+    const viewable = b.http && (b.status_code > 0 || b.body);
+    return '<div class="dservrow"><span class="dserv">' + portIcon(r.port) + " " + r.port + "</span>" +
+      '<span class="code">' + (b.http ? esc(b.status_code || 0) : "—") + "</span>" +
+      "<span>" + esc(b.server || "") + "</span>" +
+      '<span class="t">' + esc(b.title || "") + "</span>" +
+      (viewable ? '<button class="vbtn" data-ip="' + esc(r.ip) + '" data-port="' + r.port + '">ver</button>' : "") + "</div>";
+  }).join("") || '<div class="empty">sin servicios</div>';
+  const seen = new Set();
+  const files = d.files.filter(f => { if (seen.has(f.name)) return false; seen.add(f.name); return true; }).slice(0, 80);
+  $("dFiles").innerHTML = files.length ? files.map(f =>
+    '<span class="dfile" title="' + esc(f.name) + '">' + fileCat(f.name) + " " + esc(shortName(f.name)) + "</span>"
+  ).join("") : '<div class="empty">sin archivos listados en esta IP</div>';
+  const prev = $("dPrev");
+  const snapPort = d.cams ? webPortOf(d) : null;
+  const limgs = listingImgs(d, 4);
+  let ph = "";
+  if (snapPort) ph += '<div class="dprevitem"><img id="devSnap" class="snapimg big" alt="🎥 snapshot"><div class="muted" id="devSnapMsg">buscando snapshot de cámara…</div></div>';
+  if (limgs.length) ph += '<div class="dprevgrid">' + limgs.map(u => '<img class="fthumb" src="/proxy?u=' + encodeURIComponent(u) + '" onerror="this.remove()" alt="📂">').join("") + "</div>";
+  if (d.ftp) ph += '<div class="dprevitem"><button class="ftpbtn" data-ip="' + esc(d.ip) + '" data-port="' + (d.ftpPorts[0] || 21) + '">📂 listar archivos del FTP anónimo</button><span class="muted" id="ftpMsg"></span></div>';
+  prev.innerHTML = ph || '<div class="muted">sin contenido visual público en esta IP</div>';
+  if (snapPort) {
+    trySnapshots(camSnapshotUrls(d.ip, snapPort), u => {
+      const el = $("devSnap");
+      if (u) { el.src = "/proxy?u=" + encodeURIComponent(u); el.onload = () => { el.style.opacity = "1"; $("devSnapMsg").textContent = ""; }; }
+      else $("devSnapMsg").textContent = "sin snapshot público (suele pedir login)";
+    });
+  }
+  $("devModal").style.display = "block";
+}
+document.addEventListener("click", e => {
+  const btn = e.target.closest && e.target.closest(".ftpbtn");
+  if (!btn) return;
+  const msg = $("ftpMsg");
+  msg.textContent = "listando…";
+  fetch("/ftplist?ip=" + encodeURIComponent(btn.dataset.ip) + "&port=" + encodeURIComponent(btn.dataset.port)).then(r => r.ok ? r.json() : Promise.reject()).then(j => {
+    msg.textContent = "";
+    if (!j.files.length) { msg.textContent = "directorio vacío"; return; }
+    $("dFiles").innerHTML = j.files.map(f =>
+      '<span class="dfile" title="' + esc(f) + '">' + fileCat(f) + " " + esc(shortName(f)) + "</span>"
+    ).join("");
+  }).catch(() => { msg.textContent = "❌ no responde como FTP anónimo"; });
+});
+$("dClose").addEventListener("click", () => { $("devModal").style.display = "none"; });
+$("devModal").addEventListener("click", e => { if (e.target.id === "devModal") $("devModal").style.display = "none"; });
+$("export").addEventListener("click", () => {
+  const rows = filtered();
+  if (!rows.length) return;
+  const cols = ["timestamp", "ip", "port", "status", "http", "server", "title", "type", "city", "country", "isp", "asn"];
+  const clean = s => String(s == null ? "" : s).replace(/,/g, " ").replace(/\n/g, " ");
+  const lines = [cols.join(","), ...rows.map(r => {
+    const b = r.banner || {}, g = r.geo || {};
+    return [clean(r.timestamp), r.ip, r.port, r.status || "", b.http ? (b.status_code || 0) : "", clean(b.server), clean(b.title), classify(r), clean(g.city), clean(g.country), clean(g.isp), clean(g.asn)].join(",");
+  })];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+  a.download = "netscanner_filtro.csv";
+  a.click();
+});
+
+const rateHist = [];
+let prevStats = null, scanStart = null;
+function pollStats() {
+  fetch("/stats").then(r => {
+    if (r.status !== 200) { $("prog").style.display = "none"; return null; }
+    return r.json();
+  }).then(s => {
+    if (!s || !s.total) return;
+    $("prog").style.display = "block";
+    const now = Date.now();
+    if (!scanStart) scanStart = now;
+    const done = s.attempts || 0, total = s.total;
+    $("pDone").textContent = fmtK(done);
+    $("pTotal").textContent = fmtK(total);
+    $("pOpen").textContent = fmtK(s.open || 0);
+    $("pTimeout").textContent = fmtK(s.timeouts || 0);
+    $("pErr").textContent = fmtK(s.errors || 0);
+    const pct = Math.round(done / total * 100);
+    $("pPct").textContent = pct + "%" + (done >= total ? " · terminado" : "");
+    $("pBar").style.width = pct + "%";
+    if (prevStats && now > prevStats.t) {
+      const rate = (done - prevStats.a) / ((now - prevStats.t) / 1000);
+      $("pRate").textContent = fmtK(Math.round(rate)) + "/s";
+      rateHist.push(rate);
+      if (rateHist.length > 120) rateHist.shift();
+      const rem = total - done;
+      if (rate > 0.5) {
+        const sec = Math.round(rem / rate);
+        $("pEta").textContent = Math.floor(sec / 60) + "m " + (sec % 60) + "s";
+      } else $("pEta").textContent = "–";
+      drawSpark();
+    }
+    $("pElapsed").textContent = Math.floor((now - scanStart) / 1000) + "s";
+    prevStats = { t: now, a: done };
+  }).catch(() => {});
+}
+function drawSpark() {
+  if (rateHist.length < 2) return;
+  const max = Math.max(...rateHist, 1);
+  const pts = rateHist.map((r, i) => i + "," + (26 - r / max * 24)).join(" ");
+  $("pSpark").innerHTML = '<polyline points="' + pts + '" fill="none" stroke="#8fa3ff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>';
+}
+setInterval(pollStats, 1000);
+pollStats();
+
+const ev = new EventSource("/events");
+ev.addEventListener("snapshot", e => {
+  state.records = JSON.parse(e.data);
+  $("status").textContent = "en vivo · " + fmtK(state.records.length) + " históricos";
+  $("status").className = "live";
+  render();
+});
+ev.onmessage = e => {
+  try {
+    state.records.unshift(JSON.parse(e.data));
+    if (state.records.length > 3000) state.records.length = 3000;
+    if (!$("status").classList.contains("live")) { $("status").className = "live"; }
+    $("status").textContent = "en vivo";
+    render();
+  } catch (err) { /* registro incompleto */ }
+};
+ev.onerror = () => { $("status").textContent = "desconectado (reintentando…)"; $("status").className = "dead"; };
+
+loadLeaflet();
+loadMyIP();
+</script>
+</body>
+</html>
