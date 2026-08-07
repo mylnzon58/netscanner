@@ -4,12 +4,14 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 )
 
-// startFakeProxy runs a minimal SOCKS5 proxy that accepts any method and
-// CONNECTs to the requested address, returning the target's first line.
+// startFakeProxy levanta un proxy SOCKS5 mínimo que acepta cualquier
+// método y se conecta a la dirección pedida, devolviendo la primera
+// línea del destino.
 func startFakeProxy(t *testing.T, requireAuth bool) (addr string, stop func()) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -39,7 +41,7 @@ func handleProxyConn(c net.Conn, requireAuth bool) {
 	if _, err := io.ReadFull(c, methods); err != nil {
 		return
 	}
-	// greeting: reply no-auth or user/pass
+	// saludo: contestar no-auth o user/pass
 	if requireAuth {
 		_, _ = c.Write([]byte{5, 2})
 		auth := make([]byte, 2)
@@ -69,7 +71,7 @@ func handleProxyConn(c net.Conn, requireAuth bool) {
 	} else {
 		_, _ = c.Write([]byte{5, 0})
 	}
-	// CONNECT request
+	// pedido CONNECT
 	hdr := make([]byte, 4)
 	if _, err := io.ReadFull(c, hdr); err != nil {
 		return
@@ -100,43 +102,18 @@ func handleProxyConn(c net.Conn, requireAuth bool) {
 		return
 	}
 	port := binary.BigEndian.Uint16(portB)
-	target, err := net.DialTimeout("tcp", net.JoinHostPort(host, stringPort(port)), 5*time.Second)
+	target, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(int(port))), 5*time.Second)
 	if err != nil {
 		_, _ = c.Write([]byte{5, 5, 0, 1, 0, 0, 0, 0, 0, 0})
 		return
 	}
 	defer target.Close()
 	_, _ = c.Write([]byte{5, 0, 0, 1, 127, 0, 0, 1, 0, 0})
-	// relay a single line from target to client (enough for the test)
+	// reenviar una sola línea del destino al cliente (alcanza para el test)
 	b := make([]byte, 128)
 	if n, err := target.Read(b); err == nil {
 		_, _ = c.Write(b[:n])
 	}
-}
-
-func stringPort(p uint16) string {
-	return stringPortInt(int(p))
-}
-
-func stringPortInt(p int) string {
-	if p == 80 {
-		return "80"
-	}
-	return itoa(p)
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [8]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(b[i:])
 }
 
 func TestSocks5ConnectNoAuth(t *testing.T) {

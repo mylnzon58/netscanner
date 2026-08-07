@@ -71,7 +71,7 @@ func TestParseLongFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	if o.CIDR != "192.168.2.0/24" || !reflect.DeepEqual(o.Ports, []int{22}) || o.Workers != 1 {
-		t.Errorf("unexpected options: %+v", o)
+		t.Errorf("opciones inesperadas: %+v", o)
 	}
 }
 

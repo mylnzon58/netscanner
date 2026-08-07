@@ -1,5 +1,5 @@
-// Package live tails a JSONL results file and broadcasts new records
-// to subscribed web clients in real time.
+// Package live sigue un archivo de resultados JSONL y difunde los
+// registros nuevos a los clientes web suscriptos en tiempo real.
 package live
 
 import (
@@ -13,8 +13,8 @@ import (
 	"netscanner/pkg/exporter"
 )
 
-// Tailer reads records appended to a JSONL file, resuming from where
-// the previous read stopped.
+// Tailer lee los registros que se agregan a un archivo JSONL, retomando
+// desde donde quedó la lectura anterior.
 type Tailer struct {
 	path   string
 	file   *os.File
@@ -22,27 +22,27 @@ type Tailer struct {
 	mu     sync.Mutex
 }
 
-// NewTailer opens the JSONL file at path for following.
+// NewTailer abre el archivo JSONL en path para seguirlo.
 func NewTailer(path string) (*Tailer, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", path, err)
+		return nil, fmt.Errorf("abriendo %s: %w", path, err)
 	}
 	return &Tailer{path: path, file: f}, nil
 }
 
-// Close releases the underlying file.
+// Close libera el archivo subyacente.
 func (t *Tailer) Close() error { return t.file.Close() }
 
-// Rewind makes the next Read start from the beginning of the file.
+// Rewind hace que la próxima lectura empiece desde el principio.
 func (t *Tailer) Rewind() {
 	t.mu.Lock()
 	t.offset = 0
 	t.mu.Unlock()
 }
 
-// Read returns the records appended since the previous call. Lines that
-// are not valid JSON are skipped.
+// Read devuelve los registros agregados desde la llamada anterior. Las
+// líneas que no son JSON válido se saltan.
 func (t *Tailer) Read() ([]exporter.Result, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()

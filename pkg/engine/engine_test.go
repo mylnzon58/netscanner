@@ -133,7 +133,7 @@ func TestRunFindsOpenPort(t *testing.T) {
 		t.Fatalf("expected 1 open port, got %d", len(results))
 	}
 	if results[0].IP != "127.0.0.1" || results[0].Port != port || results[0].Status != "open" {
-		t.Errorf("unexpected result: %+v", results[0])
+		t.Errorf("resultado inesperado: %+v", results[0])
 	}
 	if results[0].Banner.Raw != "220 FTP banner test" {
 		t.Errorf("raw banner = %q", results[0].Banner.Raw)

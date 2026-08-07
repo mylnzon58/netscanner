@@ -1,6 +1,6 @@
-// Package socks implements a minimal SOCKS5 client (RFC 1928) with
-// username/password authentication (RFC 1929), enough to route scanner
-// connections through TOR or any SOCKS5 proxy.
+// Package socks implementa un cliente SOCKS5 mínimo (RFC 1928) con
+// autenticación de usuario/contraseña (RFC 1929), lo justo para mandar
+// las conexiones del escáner por TOR o por cualquier proxy SOCKS5.
 package socks
 
 import (
@@ -24,7 +24,7 @@ const (
 	authNoMethods = 0xFF
 )
 
-// Dialer dials TCP connections, possibly through a SOCKS5 proxy.
+// Dialer abre conexiones TCP, opcionalmente a través de un proxy SOCKS5.
 type Dialer struct {
 	addr     string
 	user     string
@@ -33,28 +33,29 @@ type Dialer struct {
 	proxyURL string
 }
 
-// NewDialer parses a socks5://[user:pass@]host:port URL and returns a
-// Dialer. An empty spec returns a nil Dialer (direct connections).
+// NewDialer parsea una URL socks5://[usuario:pass@]host:puerto y
+// devuelve un Dialer. Una spec vacía devuelve un Dialer nulo (conexión
+// directa).
 func NewDialer(spec string, timeout time.Duration) (*Dialer, error) {
 	if spec == "" {
 		return nil, nil
 	}
 	u, err := url.Parse(spec)
 	if err != nil {
-		return nil, fmt.Errorf("invalid proxy: %w", err)
+		return nil, fmt.Errorf("proxy inválido: %w", err)
 	}
 	if u.Scheme != "socks5" && u.Scheme != "socks5h" {
-		return nil, fmt.Errorf("invalid proxy: scheme %q (use socks5://host:port)", u.Scheme)
+		return nil, fmt.Errorf("proxy inválido: esquema %q (usá socks5://host:puerto)", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
-		return nil, errors.New("invalid proxy: missing host")
+		return nil, errors.New("proxy inválido: falta el host")
 	}
 	if u.Port() == "" {
-		return nil, errors.New("invalid proxy: missing port")
+		return nil, errors.New("proxy inválido: falta el puerto")
 	}
 	if _, err := strconv.Atoi(u.Port()); err != nil {
-		return nil, fmt.Errorf("invalid proxy: %w", err)
+		return nil, fmt.Errorf("proxy inválido: %w", err)
 	}
 	user := ""
 	pass := ""
@@ -68,7 +69,7 @@ func NewDialer(spec string, timeout time.Duration) (*Dialer, error) {
 	return &Dialer{addr: net.JoinHostPort(host, u.Port()), user: user, pass: pass, timeout: timeout, proxyURL: spec}, nil
 }
 
-// URL returns the proxy spec as provided by the user.
+// URL devuelve la spec del proxy tal como la dio el usuario.
 func (d *Dialer) URL() string {
 	if d == nil {
 		return ""
@@ -76,11 +77,11 @@ func (d *Dialer) URL() string {
 	return d.proxyURL
 }
 
-// Dial opens a TCP connection to addr through the SOCKS5 proxy.
+// Dial abre una conexión TCP a addr a través del proxy SOCKS5.
 func (d *Dialer) Dial(addr string) (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", d.addr, d.timeout)
 	if err != nil {
-		return nil, fmt.Errorf("proxy connect: %w", err)
+		return nil, fmt.Errorf("conectando al proxy: %w", err)
 	}
 	ok := false
 	defer func() {
@@ -122,9 +123,9 @@ func handshake(conn net.Conn, user, pass string) error {
 	case authUserPass:
 		return userPassAuth(conn, user, pass)
 	case authNoMethods:
-		return errors.New("proxy rejected all authentication methods")
+		return errors.New("el proxy rechazó todos los métodos de autenticación")
 	default:
-		return fmt.Errorf("unexpected auth method %d", resp[1])
+		return fmt.Errorf("método de autenticación inesperado %d", resp[1])
 	}
 }
 
@@ -156,7 +157,7 @@ func connect(conn net.Conn, addr string) error {
 	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port < 1 || port > 65535 {
-		return fmt.Errorf("invalid port %q", portStr)
+		return fmt.Errorf("puerto inválido %q", portStr)
 	}
 	var atyp byte
 	var dst []byte
@@ -165,11 +166,11 @@ func connect(conn net.Conn, addr string) error {
 			atyp = atypIPv4
 			dst = ip4
 		} else {
-			return errors.New("IPv6 addresses are not supported")
+			return errors.New("las direcciones IPv6 no están soportadas")
 		}
 	} else {
 		if len(host) > 255 {
-			return errors.New("hostname too long")
+			return errors.New("hostname demasiado largo")
 		}
 		atyp = atypDomain
 		dst = append([]byte{byte(len(host))}, host...)
@@ -190,7 +191,7 @@ func connect(conn net.Conn, addr string) error {
 	if resp[1] != repSuccess {
 		return fmt.Errorf("CONNECT rechazado (código %d)", resp[1])
 	}
-	// addr type (1) + address (4/255) + port (2)
+	// tipo de addr (1) + dirección (4/255) + puerto (2)
 	skip := 0
 	switch resp[3] {
 	case atypIPv4:

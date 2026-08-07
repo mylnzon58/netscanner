@@ -1,4 +1,4 @@
-// Package config parses and validates the netscanner command-line flags.
+// Package config se encarga de leer y validar los flags de netscanner.
 package config
 
 import (
@@ -26,7 +26,7 @@ const (
 	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 )
 
-// Options holds the validated runtime configuration of the scanner.
+// Options guarda la configuración ya validada del escáner.
 type Options struct {
 	CIDR         string
 	PortsRaw     string
@@ -46,36 +46,36 @@ type Options struct {
 	UserAgent    string
 }
 
-// Parse reads the CLI flags from args (excluding the program name),
-// validates them and returns the resulting Options.
+// Parse lee los flags de args (sin el nombre del programa), los valida
+// y devuelve las Options resultantes.
 func Parse(args []string) (*Options, error) {
 	opts := &Options{}
 
 	fs := flag.NewFlagSet("netscanner", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 
-	fs.StringVar(&opts.CIDR, "cidr", DefaultCIDR, "CIDR range to scan (IPv4), e.g. 192.168.1.0/24")
-	fs.StringVar(&opts.CIDR, "c", DefaultCIDR, "shorthand for --cidr")
-	fs.StringVar(&opts.PortsRaw, "ports", DefaultPorts, "comma-separated TCP ports, e.g. 80,443")
-	fs.StringVar(&opts.PortsRaw, "p", DefaultPorts, "shorthand for --ports")
-	fs.IntVar(&opts.Workers, "workers", DefaultWorkers, "maximum number of concurrent connections")
-	fs.IntVar(&opts.Workers, "w", DefaultWorkers, "shorthand for --workers")
-	fs.IntVar(&opts.TimeoutMS, "timeout", DefaultTimeoutMS, "connection timeout in milliseconds")
-	fs.IntVar(&opts.TimeoutMS, "t", DefaultTimeoutMS, "shorthand for --timeout")
-	fs.StringVar(&opts.GeoIPPath, "geoip", DefaultGeoIPPath, "path to the GeoLite2 City .mmdb database")
-	fs.StringVar(&opts.GeoIPPath, "g", DefaultGeoIPPath, "shorthand for --geoip")
-	fs.StringVar(&opts.Output, "output", DefaultOutput, "path of the JSONL output file")
-	fs.StringVar(&opts.Output, "o", DefaultOutput, "shorthand for --output")
-	fs.IntVar(&opts.MaxBodyKB, "max-body", DefaultMaxBodyKB, "max HTTP body captured per web port, in KiB (0 disables)")
-	fs.StringVar(&opts.StatsFile, "stats", DefaultStatsFile, "write live scan progress to this JSON file (for the dashboard)")
-	fs.StringVar(&opts.FTPPortsRaw, "ftp-ports", DefaultFTPPorts, "ports that get an anonymous FTP login probe")
-	fs.BoolVar(&opts.DAV, "dav", DefaultDAV, "probe web ports with PROPFIND to detect WebDAV shares")
-	fs.StringVar(&opts.Proxy, "proxy", "", "route every connection through a SOCKS5 proxy, e.g. socks5://127.0.0.1:9050 (TOR)")
-	fs.StringVar(&opts.UserAgent, "user-agent", DefaultUserAgent, "HTTP User-Agent sent in the probes")
+	fs.StringVar(&opts.CIDR, "cidr", DefaultCIDR, "rango CIDR a escanear (IPv4), p.ej. 192.168.1.0/24")
+	fs.StringVar(&opts.CIDR, "c", DefaultCIDR, "abreviatura de --cidr")
+	fs.StringVar(&opts.PortsRaw, "ports", DefaultPorts, "puertos TCP separados por coma, p.ej. 80,443")
+	fs.StringVar(&opts.PortsRaw, "p", DefaultPorts, "abreviatura de --ports")
+	fs.IntVar(&opts.Workers, "workers", DefaultWorkers, "máximo de conexiones en paralelo")
+	fs.IntVar(&opts.Workers, "w", DefaultWorkers, "abreviatura de --workers")
+	fs.IntVar(&opts.TimeoutMS, "timeout", DefaultTimeoutMS, "timeout de conexión en milisegundos")
+	fs.IntVar(&opts.TimeoutMS, "t", DefaultTimeoutMS, "abreviatura de --timeout")
+	fs.StringVar(&opts.GeoIPPath, "geoip", DefaultGeoIPPath, "ruta a la base GeoLite2 City .mmdb")
+	fs.StringVar(&opts.GeoIPPath, "g", DefaultGeoIPPath, "abreviatura de --geoip")
+	fs.StringVar(&opts.Output, "output", DefaultOutput, "ruta del archivo JSONL de salida")
+	fs.StringVar(&opts.Output, "o", DefaultOutput, "abreviatura de --output")
+	fs.IntVar(&opts.MaxBodyKB, "max-body", DefaultMaxBodyKB, "máximo del cuerpo HTTP capturado por puerto web, en KiB (0 lo desactiva)")
+	fs.StringVar(&opts.StatsFile, "stats", DefaultStatsFile, "escribir el progreso en vivo a este JSON (para el dashboard)")
+	fs.StringVar(&opts.FTPPortsRaw, "ftp-ports", DefaultFTPPorts, "puertos que reciben sondeo de login FTP anónimo")
+	fs.BoolVar(&opts.DAV, "dav", DefaultDAV, "sondear puertos web con PROPFIND para detectar WebDAV")
+	fs.StringVar(&opts.Proxy, "proxy", "", "mandar todas las conexiones por un proxy SOCKS5, p.ej. socks5://127.0.0.1:9050 (TOR)")
+	fs.StringVar(&opts.UserAgent, "user-agent", DefaultUserAgent, "User-Agent HTTP que mandan los sondeos")
 
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "netscanner - high performance TCP network discovery engine\n\n")
-		fmt.Fprintf(fs.Output(), "Usage: netscanner [options]\n\nOptions:\n")
+		fmt.Fprintf(fs.Output(), "netscanner - motor de descubrimiento de red TCP de alto rendimiento\n\n")
+		fmt.Fprintf(fs.Output(), "Uso: netscanner [opciones]\n\nOpciones:\n")
 		fs.PrintDefaults()
 	}
 
@@ -83,7 +83,7 @@ func Parse(args []string) (*Options, error) {
 		return nil, err
 	}
 	if fs.NArg() > 0 {
-		return nil, fmt.Errorf("unexpected positional arguments: %v", fs.Args())
+		return nil, fmt.Errorf("argumentos posicionales inesperados: %v", fs.Args())
 	}
 	if err := opts.validate(); err != nil {
 		return nil, err
@@ -94,10 +94,10 @@ func Parse(args []string) (*Options, error) {
 func (o *Options) validate() error {
 	_, ipnet, err := net.ParseCIDR(o.CIDR)
 	if err != nil {
-		return fmt.Errorf("invalid --cidr %q: %w", o.CIDR, err)
+		return fmt.Errorf("--cidr inválido %q: %w", o.CIDR, err)
 	}
 	if ipnet.IP.To4() == nil {
-		return fmt.Errorf("invalid --cidr %q: only IPv4 networks are supported", o.CIDR)
+		return fmt.Errorf("--cidr inválido %q: solo se soportan redes IPv4", o.CIDR)
 	}
 
 	ports, err := parsePorts(o.PortsRaw)
@@ -107,20 +107,20 @@ func (o *Options) validate() error {
 	o.Ports = ports
 
 	if o.Workers < 1 || o.Workers > 1<<16 {
-		return fmt.Errorf("invalid --workers %d: must be between 1 and 65536", o.Workers)
+		return fmt.Errorf("--workers inválido %d: debe estar entre 1 y 65536", o.Workers)
 	}
 	if o.TimeoutMS < 10 || o.TimeoutMS > 5*60*1000 {
-		return fmt.Errorf("invalid --timeout %d: must be between 10 and 300000 ms", o.TimeoutMS)
+		return fmt.Errorf("--timeout inválido %d: debe estar entre 10 y 300000 ms", o.TimeoutMS)
 	}
 	o.Timeout = time.Duration(o.TimeoutMS) * time.Millisecond
 
 	if o.MaxBodyKB < 0 || o.MaxBodyKB > 512 {
-		return fmt.Errorf("invalid --max-body %d: must be between 0 and 512 KiB", o.MaxBodyKB)
+		return fmt.Errorf("--max-body inválido %d: debe estar entre 0 y 512 KiB", o.MaxBodyKB)
 	}
 	o.MaxBodyBytes = o.MaxBodyKB * 1024
 
 	if strings.TrimSpace(o.FTPPortsRaw) == "" {
-		return fmt.Errorf("invalid --ftp-ports: must not be empty")
+		return fmt.Errorf("--ftp-ports inválido: no puede estar vacío")
 	}
 	ftp, err := parsePorts(o.FTPPortsRaw)
 	if err != nil {
@@ -134,10 +134,11 @@ func (o *Options) validate() error {
 	return nil
 }
 
-// parsePorts splits, validates, deduplicates and sorts a port list.
+// parsePorts separa, valida, elimina duplicados y ordena una lista de
+// puertos escrita como texto.
 func parsePorts(raw string) ([]int, error) {
 	if strings.TrimSpace(raw) == "" {
-		return nil, fmt.Errorf("invalid --ports: must not be empty")
+		return nil, fmt.Errorf("--ports inválido: no puede estar vacío")
 	}
 	seen := make(map[int]bool)
 	var out []int
@@ -148,7 +149,7 @@ func parsePorts(raw string) ([]int, error) {
 		}
 		n, err := strconv.Atoi(s)
 		if err != nil || n < 1 || n > 65535 {
-			return nil, fmt.Errorf("invalid port %q: must be an integer between 1 and 65535", s)
+			return nil, fmt.Errorf("puerto inválido %q: debe ser un entero entre 1 y 65535", s)
 		}
 		if !seen[n] {
 			seen[n] = true
@@ -156,7 +157,7 @@ func parsePorts(raw string) ([]int, error) {
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("invalid --ports: must not be empty")
+		return nil, fmt.Errorf("--ports inválido: no puede estar vacío")
 	}
 	sort.Ints(out)
 	return out, nil

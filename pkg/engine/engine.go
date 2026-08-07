@@ -1,5 +1,5 @@
-// Package engine implements streaming CIDR address generation and the
-// bounded worker pool that performs the TCP probes.
+// Package engine genera las direcciones de un CIDR en streaming y arma
+// el pool de workers que ejecuta los sondeos TCP.
 package engine
 
 import (
@@ -26,7 +26,7 @@ type job struct {
 	port int
 }
 
-// Stats holds the cumulative counters of a scan run.
+// Stats acumula los contadores de una corrida de escaneo.
 type Stats struct {
 	Attempts atomic.Uint64
 	Open     atomic.Uint64
@@ -34,7 +34,8 @@ type Stats struct {
 	Errored  atomic.Uint64
 }
 
-// Snapshot is a plain copy of the counters, safe to print from any goroutine.
+// Snapshot es una copia simple de los contadores, segura de imprimir
+// desde cualquier goroutine.
 type Snapshot struct {
 	Attempts uint64
 	Open     uint64
@@ -42,7 +43,7 @@ type Snapshot struct {
 	Errored  uint64
 }
 
-// Snapshot returns the current counter values.
+// Snapshot devuelve los valores actuales de los contadores.
 func (s *Stats) Snapshot() Snapshot {
 	return Snapshot{
 		Attempts: s.Attempts.Load(),
@@ -52,13 +53,13 @@ func (s *Stats) Snapshot() Snapshot {
 	}
 }
 
-// HostCount returns the number of usable host addresses inside ipnet.
-// For IPv4 networks /31 and /32 use every address; larger networks
-// exclude the network and broadcast addresses.
+// HostCount devuelve cuántas direcciones usables hay en ipnet. Las
+// redes /31 y /32 usan todas sus direcciones; las más grandes excluyen
+// la dirección de red y la de broadcast.
 func HostCount(ipnet *net.IPNet) (uint64, error) {
 	ones, bits := ipnet.Mask.Size()
 	if bits != 32 {
-		return 0, errors.New("only IPv4 networks are supported")
+		return 0, errors.New("solo se soportan redes IPv4")
 	}
 	count := uint64(1) << (32 - ones)
 	if ones >= 31 {
@@ -67,9 +68,9 @@ func HostCount(ipnet *net.IPNet) (uint64, error) {
 	return count - 2, nil
 }
 
-// IPs streams the usable addresses of ipnet through the returned channel.
-// Generation stops as soon as ctx is cancelled, which lets a graceful
-// shutdown stop probing immediately without buffering the whole range.
+// IPs envía por el canal las direcciones usables de ipnet en streaming.
+// La generación se corta apenas se cancela ctx, así el cierre puede
+// detener los sondeos sin tener que bufferear todo el rango.
 func IPs(ctx context.Context, ipnet *net.IPNet) <-chan net.IP {
 	ch := make(chan net.IP, 256)
 	go func() {
@@ -100,25 +101,24 @@ func IPs(ctx context.Context, ipnet *net.IPNet) <-chan net.IP {
 	return ch
 }
 
-// Run executes the scan: the addresses of opts.CIDR are streamed into a
-// worker pool bounded by opts.Workers, and every open (ip, port) pair is
-// fingerprinted, geolocated and sent to out.
+// Run ejecuta el escaneo: las direcciones de opts.CIDR entran en
+// streaming a un pool de workers acotado por opts.Workers, y cada par
+// (ip, puerto) abierto se identifica, se geolocaliza y se manda a out.
 //
-// Run blocks until the whole range has been probed or ctx is cancelled.
-// On cancellation the generator stops feeding new jobs and the in-flight
-// dials (each bounded by opts.Timeout) are allowed to finish, which makes
-// the shutdown graceful.
+// Run bloquea hasta sondear todo el rango o hasta que cancelen ctx. Al
+// cancelar, el generador deja de mandar trabajos y los dials en vuelo
+// (acotados por opts.Timeout) terminan, así el cierre es prolijo.
 func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- exporter.Result) (*Stats, error) {
 	_, ipnet, err := net.ParseCIDR(opts.CIDR)
 	if err != nil {
-		return nil, fmt.Errorf("invalid CIDR %q: %w", opts.CIDR, err)
+		return nil, fmt.Errorf("CIDR inválido %q: %w", opts.CIDR, err)
 	}
 	hosts, err := HostCount(ipnet)
 	if err != nil {
 		return nil, err
 	}
 	if hosts == 0 {
-		return nil, fmt.Errorf("network %s has no usable host addresses", opts.CIDR)
+		return nil, fmt.Errorf("la red %s no tiene direcciones usables", opts.CIDR)
 	}
 
 	stats := &Stats{}
@@ -193,7 +193,7 @@ func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- ex
 	return stats, nil
 }
 
-// writeStats persists the live progress of a scan for the dashboard.
+// writeStats guarda el progreso en vivo de un escaneo para el panel.
 func writeStats(path string, total uint64, s *Stats) {
 	snap := struct {
 		Total    uint64 `json:"total"`
@@ -215,7 +215,7 @@ func writeStats(path string, total uint64, s *Stats) {
 	_ = os.WriteFile(path, data, 0o644)
 }
 
-// Dialer routes TCP connections: nil means direct dialing.
+// Dialer enruta las conexiones TCP: si es nil, se dialea directo.
 var Dialer = struct {
 	Dial func(addr string) (net.Conn, error)
 }{}

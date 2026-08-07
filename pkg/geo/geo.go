@@ -1,5 +1,5 @@
-// Package geo resolves the geographical location of public IPv4
-// addresses using a local MaxMind GeoLite2 City database (.mmdb).
+// Package geo resuelve la ubicación geográfica de direcciones IPv4
+// públicas usando la base local MaxMind GeoLite2 City (.mmdb).
 package geo
 
 import (
@@ -9,7 +9,7 @@ import (
 	"github.com/oschwald/geoip2-golang"
 )
 
-// Location is the geographic enrichment attached to a scan result.
+// Location es el enriquecimiento geográfico pegado a un resultado.
 type Location struct {
 	Label     string
 	Country   string
@@ -18,27 +18,27 @@ type Location struct {
 	Longitude float64
 }
 
-// GeoDB wraps the MaxMind reader. A nil reader means the database is
-// unavailable and every lookup returns the Unknown location.
+// GeoDB envuelve el lector de MaxMind. Un lector nulo significa que la
+// base no está disponible y toda consulta devuelve Unknown.
 type GeoDB struct {
 	reader *geoip2.Reader
 }
 
-// Open loads the .mmdb database at path. When the file cannot be read
-// an error is returned and callers can fall back to Unavailable.
+// Open carga la base .mmdb en path. Si el archivo no se puede leer se
+// devuelve un error y los llamadores pueden usar Unavailable.
 func Open(path string) (*GeoDB, error) {
 	r, err := geoip2.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", path, err)
+		return nil, fmt.Errorf("abriendo %s: %w", path, err)
 	}
 	return &GeoDB{reader: r}, nil
 }
 
-// Unavailable returns a GeoDB that reports Unknown for every address,
-// used when no database file is present.
+// Unavailable devuelve un GeoDB que reporta Unknown para todas las
+// direcciones; se usa cuando no hay archivo de base.
 func Unavailable() *GeoDB { return &GeoDB{} }
 
-// Close releases the underlying database file.
+// Close libera el archivo de base subyacente.
 func (g *GeoDB) Close() error {
 	if g == nil || g.reader == nil {
 		return nil
@@ -46,9 +46,9 @@ func (g *GeoDB) Close() error {
 	return g.reader.Close()
 }
 
-// Lookup resolves ip to a Location. Private addresses are labelled
-// Internal/Private without querying the database; public addresses are
-// resolved against the local .mmdb; anything else is Unknown.
+// Lookup resuelve ip a una Location. Las direcciones privadas se
+// etiquetan como Internal/Private sin consultar la base; las públicas se
+// resuelven contra el .mmdb local; todo lo demás es Unknown.
 func (g *GeoDB) Lookup(ip net.IP) Location {
 	ip4 := ip.To4()
 	if ip4 != nil && IsPrivate(ip4) {
@@ -74,8 +74,8 @@ func (g *GeoDB) Lookup(ip net.IP) Location {
 	}
 }
 
-// IsPrivate reports whether ip belongs to a private or special-purpose
-// IPv4 range: RFC 1918, loopback and link-local.
+// IsPrivate indica si ip pertenece a un rango IPv4 privado o de uso
+// especial: RFC 1918, loopback y link-local.
 func IsPrivate(ip net.IP) bool {
 	ip4 := ip.To4()
 	if ip4 == nil {

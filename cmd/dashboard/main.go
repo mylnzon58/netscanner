@@ -1,4 +1,5 @@
-// Command dashboard is a live web viewer for netscanner JSONL results.
+// El comando dashboard es un visor web en vivo de los resultados
+// JSONL de netscanner.
 package main
 
 import (
@@ -30,12 +31,12 @@ import (
 var indexHTML []byte
 
 func main() {
-	file := flag.String("file", "results.jsonl", "JSONL results file to watch")
-	addr := flag.String("addr", "127.0.0.1:8080", "listen address for the web panel")
-	limit := flag.Int("limit", 5000, "max records kept in memory")
-	poll := flag.Duration("poll", 500*time.Millisecond, "file polling interval")
-	statsFile := flag.String("stats", "", "scanner stats file for live progress (optional)")
-	proxySpec := flag.String("proxy", "", "route /proxy and /ftplist connections through a SOCKS5 proxy (e.g. socks5://127.0.0.1:9050)")
+	file := flag.String("file", "results.jsonl", "archivo JSONL de resultados a vigilar")
+	addr := flag.String("addr", "127.0.0.1:8080", "dirección de escucha del panel web")
+	limit := flag.Int("limit", 5000, "máximo de registros retenidos en memoria")
+	poll := flag.Duration("poll", 500*time.Millisecond, "intervalo de revisión del archivo")
+	statsFile := flag.String("stats", "", "archivo de progreso del escáner para el panel en vivo (opcional)")
+	proxySpec := flag.String("proxy", "", "mandar /proxy y /ftplist por un proxy SOCKS5 (p.ej. socks5://127.0.0.1:9050)")
 	flag.Parse()
 
 	if *limit < 100 {
@@ -127,9 +128,9 @@ func main() {
 
 	srv := &http.Server{Addr: *addr, Handler: mux}
 	go func() {
-		fmt.Fprintf(os.Stderr, "[dashboard] watching %s on http://%s\n", *file, *addr)
+		fmt.Fprintf(os.Stderr, "[dashboard] vigilando %s en http://%s\n", *file, *addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			fmt.Fprintln(os.Stderr, "server error:", err)
+			fmt.Fprintln(os.Stderr, "error del servidor:", err)
 		}
 	}()
 
@@ -149,7 +150,7 @@ func openTailerRetry(path string, ctx context.Context) (*live.Tailer, error) {
 		case <-ctx.Done():
 			return nil, err
 		case <-time.After(1 * time.Second):
-			fmt.Fprintf(os.Stderr, "[dashboard] waiting for %s...\n", path)
+			fmt.Fprintf(os.Stderr, "[dashboard] esperando %s...\n", path)
 		}
 	}
 }
@@ -160,7 +161,7 @@ var statsCache struct {
 	data []byte
 }
 
-// handleStats serves the scanner progress file with a short cache.
+// handleStats sirve el archivo de progreso del escáner con caché corta.
 func handleStats(w http.ResponseWriter, r *http.Request, path string) {
 	if path == "" {
 		http.NotFound(w, r)
@@ -184,25 +185,25 @@ const maxProxyBytes = 2 << 20
 
 var proxyClient = http.DefaultClient
 
-// handleProxy fetches a page or image from a scanned host so the panel
-// can display it inline.
+// handleProxy baja una página o imagen de un host escaneado para que el
+// panel pueda mostrarla inline.
 func handleProxy(w http.ResponseWriter, r *http.Request) {
 	p, err := url.Parse(r.URL.Query().Get("u"))
 	if err != nil || (p.Scheme != "http" && p.Scheme != "https") || p.Host == "" {
-		http.Error(w, "bad url", http.StatusBadRequest)
+		http.Error(w, "url inválida", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.String(), nil)
 	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
 		return
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36")
 	resp, err := proxyClient.Do(req)
 	if err != nil {
-		http.Error(w, "fetch failed", http.StatusBadGateway)
+		http.Error(w, "no se pudo descargar", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
@@ -211,11 +212,11 @@ func handleProxy(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.CopyN(w, resp.Body, maxProxyBytes)
 }
 
-// handleLookup resolves a hostname to its IP addresses (DNS).
+// handleLookup resuelve un hostname a sus direcciones IP (DNS).
 func handleLookup(w http.ResponseWriter, r *http.Request) {
 	host := strings.TrimSpace(r.URL.Query().Get("host"))
 	if host == "" || len(host) > 255 {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
@@ -229,19 +230,19 @@ func handleLookup(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"host": host, "ips": ips})
 }
 
-// handleShodan queries the public Shodan InternetDB (no API key needed)
-// for the ports/services publicly indexed for an IP.
+// handleShodan consulta el Shodan InternetDB público (sin API key) por
+// los puertos y servicios que están indexados para una IP.
 func handleShodan(w http.ResponseWriter, r *http.Request) {
 	ip := strings.TrimSpace(r.URL.Query().Get("ip"))
 	if net.ParseIP(ip) == nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://internetdb.shodan.io/"+ip, nil)
 	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
 		return
 	}
 	req.Header.Set("Accept", "application/json")
@@ -256,8 +257,8 @@ func handleShodan(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, resp.Body)
 }
 
-// handleIPLookup resolves the ISP/city of an IP through ip-api.com
-// (cached 10 minutes per IP).
+// handleIPLookup resuelve el ISP y la ciudad de una IP con ip-api.com
+// (con caché de 10 minutos por IP).
 var ipLookupCache = struct {
 	mu   sync.Mutex
 	data map[string]json.RawMessage
@@ -267,7 +268,7 @@ var ipLookupCache = struct {
 func handleIPLookup(w http.ResponseWriter, r *http.Request) {
 	ip := strings.TrimSpace(r.URL.Query().Get("ip"))
 	if net.ParseIP(ip) == nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
 		return
 	}
 	ipLookupCache.mu.Lock()
@@ -279,12 +280,12 @@ func handleIPLookup(w http.ResponseWriter, r *http.Request) {
 	}
 	info, err := geo.LookupOnline([]string{ip})
 	if err != nil || len(info) == 0 {
-		http.Error(w, "unavailable", http.StatusBadGateway)
+		http.Error(w, "no disponible", http.StatusBadGateway)
 		return
 	}
 	d, err := json.Marshal(info[ip])
 	if err != nil {
-		http.Error(w, "unavailable", http.StatusInternalServerError)
+		http.Error(w, "no disponible", http.StatusInternalServerError)
 		return
 	}
 	ipLookupCache.data[ip] = d
@@ -299,20 +300,20 @@ var myipCache struct {
 	data []byte
 }
 
-// handleMyIP resolves the caller's public address and ISP through
-// ip-api.com, cached for 10 minutes.
+// handleMyIP resuelve la dirección pública y el ISP de quien consulta
+// con ip-api.com, con caché de 10 minutos.
 func handleMyIP(w http.ResponseWriter, r *http.Request) {
 	myipCache.mu.Lock()
 	defer myipCache.mu.Unlock()
 	if time.Since(myipCache.at) > 10*time.Minute {
 		info, err := geo.LookupMyIP()
 		if err != nil {
-			http.Error(w, "unavailable", http.StatusBadGateway)
+			http.Error(w, "no disponible", http.StatusBadGateway)
 			return
 		}
 		d, err := json.Marshal(info)
 		if err != nil {
-			http.Error(w, "unavailable", http.StatusInternalServerError)
+			http.Error(w, "no disponible", http.StatusInternalServerError)
 			return
 		}
 		myipCache.data = d
@@ -332,13 +333,13 @@ var ftpListCache = struct {
 	data map[string]ftpListEntry
 }{data: make(map[string]ftpListEntry)}
 
-// handleFTPList lists an anonymous FTP directory (GET /ftplist?ip=X&port=Y),
-// cached per host for 30 seconds.
+// handleFTPList lista un directorio FTP anónimo (GET /ftplist?ip=X&port=Y),
+// con caché por host de 30 segundos.
 func handleFTPList(w http.ResponseWriter, r *http.Request) {
 	ip := r.URL.Query().Get("ip")
 	port, err := strconv.Atoi(r.URL.Query().Get("port"))
 	if err != nil || ip == "" || port < 1 || port > 65535 {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
 		return
 	}
 	key := ip + ":" + strconv.Itoa(port)
@@ -348,7 +349,7 @@ func handleFTPList(w http.ResponseWriter, r *http.Request) {
 	if !ok || time.Since(entry.at) > 30*time.Second {
 		files, err := banner.FTPList(ip, port, 6*time.Second)
 		if err != nil {
-			http.Error(w, "ftp error: "+err.Error(), http.StatusBadGateway)
+			http.Error(w, "ftp: "+err.Error(), http.StatusBadGateway)
 			return
 		}
 		entry = ftpListEntry{at: time.Now(), files: files}
@@ -364,7 +365,7 @@ func handleFTPList(w http.ResponseWriter, r *http.Request) {
 func handleEvents(hub *live.Hub, w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		http.Error(w, "streaming no soportado", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")

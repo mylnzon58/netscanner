@@ -1,4 +1,5 @@
-// Command netscanner is the entrypoint of the network discovery engine.
+// El comando netscanner es el punto de entrada del motor de
+// descubrimiento de red.
 package main
 
 import (
@@ -36,7 +37,7 @@ func main() {
 	_, ipnet, _ := net.ParseCIDR(opts.CIDR)
 	if hosts, err := engine.HostCount(ipnet); err == nil {
 		if total := hosts * uint64(len(opts.Ports)); total > 1_000_000 {
-			fmt.Fprintf(os.Stderr, "[warn] %s will probe about %d (ip,port) pairs\n", opts.CIDR, total)
+			fmt.Fprintf(os.Stderr, "[aviso] %s sondeará cerca de %d pares (ip,puerto)\n", opts.CIDR, total)
 		}
 	}
 
@@ -62,7 +63,7 @@ func main() {
 
 	db, err := geo.Open(opts.GeoIPPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[warn] GeoIP database unavailable: %v (geo will be Unknown)\n", err)
+		fmt.Fprintf(os.Stderr, "[aviso] base GeoIP no disponible: %v (la geo quedará como Unknown)\n", err)
 		db = geo.Unavailable()
 	}
 	defer db.Close()
@@ -73,7 +74,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Fprintln(os.Stderr, "[netscanner] scanning (Ctrl+C stops gracefully) ...")
+	fmt.Fprintln(os.Stderr, "[netscanner] escaneando (Ctrl+C detiene de forma prolija) ...")
 
 	stats, err := engine.Run(ctx, opts, db, exp.Results())
 	if err != nil {
@@ -82,11 +83,11 @@ func main() {
 	}
 
 	if err := exp.Close(); err != nil {
-		fmt.Fprintln(os.Stderr, "error flushing output:", err)
+		fmt.Fprintln(os.Stderr, "error al descargar la salida:", err)
 		os.Exit(1)
 	}
 
 	s := stats.Snapshot()
-	fmt.Fprintf(os.Stderr, "\n[done] attempts=%d open=%d timeouts=%d errors=%d duration=%s output=%s\n",
+	fmt.Fprintf(os.Stderr, "\n[listo] intentos=%d abiertos=%d timeouts=%d errores=%d duración=%s salida=%s\n",
 		s.Attempts, s.Open, s.Timeout, s.Errored, time.Since(start).Round(time.Millisecond), opts.Output)
 }

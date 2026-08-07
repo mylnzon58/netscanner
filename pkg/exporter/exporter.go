@@ -1,5 +1,5 @@
-// Package exporter writes scan results to disk in JSON Lines format
-// through a dedicated I/O goroutine.
+// Package exporter escribe los resultados a disco en formato JSON
+// Lines desde una goroutine dedicada de I/O.
 package exporter
 
 import (
@@ -12,7 +12,7 @@ import (
 
 const bufSize = 64 * 1024
 
-// Banner is the fingerprint of the service behind an open port.
+// Banner es la huella del servicio que hay detrás de un puerto abierto.
 type Banner struct {
 	IsHTTP     bool   `json:"http"`
 	StatusCode int    `json:"status_code"`
@@ -26,8 +26,8 @@ type Banner struct {
 	DAVBody    string `json:"dav_body,omitempty"`
 }
 
-// Geo is the location data of the scanned address. ISP, ASN and Org
-// are filled only when an online enrichment pass runs.
+// Geo es la ubicación de la dirección escaneada. ISP, ASN y Org solo se
+// completan cuando corre una pasada de enriquecimiento online.
 type Geo struct {
 	Label     string  `json:"label"`
 	Country   string  `json:"country"`
@@ -39,7 +39,7 @@ type Geo struct {
 	Org       string  `json:"org,omitempty"`
 }
 
-// Result is one JSONL record: a single open (ip, port) pair.
+// Result es un registro JSONL: un par (ip, puerto) abierto.
 type Result struct {
 	Timestamp string `json:"timestamp"`
 	IP        string `json:"ip"`
@@ -49,8 +49,8 @@ type Result struct {
 	Geo       Geo    `json:"geo"`
 }
 
-// Writer drains a results channel on a single I/O goroutine and writes
-// JSONL records to the output file in large buffered chunks.
+// Writer drena un canal de resultados en una sola goroutine de I/O y
+// escribe los registros JSONL en chunks grandes con buffer.
 type Writer struct {
 	ch   chan Result
 	file *os.File
@@ -60,12 +60,12 @@ type Writer struct {
 	err  error
 }
 
-// NewWriter opens (or appends to) the file at path and starts the
-// dedicated I/O goroutine. buffer is the size of the results channel.
+// NewWriter abre (o agrega al final de) el archivo en path y arranca la
+// goroutine de I/O. buffer es el tamaño del canal de resultados.
 func NewWriter(path string, buffer int) (*Writer, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
-		return nil, fmt.Errorf("open output file: %w", err)
+		return nil, fmt.Errorf("abriendo el archivo de salida: %w", err)
 	}
 	w := &Writer{
 		ch:   make(chan Result, buffer),
@@ -90,11 +90,11 @@ func (w *Writer) loop() {
 	}
 }
 
-// Results returns the channel where scan results must be sent.
+// Results devuelve el canal por donde hay que mandar los resultados.
 func (w *Writer) Results() chan<- Result { return w.ch }
 
-// Close stops the I/O goroutine, flushes every buffered record to disk
-// and closes the file. It must be called exactly once.
+// Close frena la goroutine de I/O, descarga todos los registros
+// pendientes a disco y cierra el archivo. Solo se llama una vez.
 func (w *Writer) Close() error {
 	close(w.ch)
 	w.wg.Wait()

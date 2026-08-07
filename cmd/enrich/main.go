@@ -1,7 +1,8 @@
-// Command enrich geolocates the IPs of an existing JSONL results file
-// using the free ip-api.com service (sampled to one address per /24)
-// and writes a new JSONL file with the coordinates and ISP fields
-// filled in. The original file is never modified.
+// El comando enrich geolocaliza las IPs de un archivo JSONL de
+// resultados ya existente usando el servicio gratuito de ip-api.com
+// (muestreado a una dirección por /24) y escribe un archivo JSONL nuevo
+// con las coordenadas y los campos de ISP completados. El archivo
+// original nunca se modifica.
 package main
 
 import (
@@ -28,9 +29,9 @@ type record struct {
 }
 
 func main() {
-	in := flag.String("in", "proveedor.jsonl", "input JSONL results file")
-	out := flag.String("out", "", "output JSONL file (default: <in> without extension + _geo.jsonl)")
-	sample := flag.Bool("sample", true, "query only one IP per /24 block")
+	in := flag.String("in", "proveedor.jsonl", "archivo JSONL de resultados de entrada")
+	out := flag.String("out", "", "archivo JSONL de salida (por defecto: <in> sin extensión + _geo.jsonl)")
+	sample := flag.Bool("sample", true, "consultar solo una IP por bloque /24")
 	flag.Parse()
 
 	if *out == "" {
@@ -42,7 +43,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("[enrich] %d records, %d unique public IPs\n", len(recs), len(unique))
+	fmt.Printf("[enrich] %d registros, %d IPs públicas únicas\n", len(recs), len(unique))
 
 	toQuery := make([]string, 0, len(unique))
 	for ip := range unique {
@@ -50,7 +51,7 @@ func main() {
 	}
 	if *sample {
 		toQuery = geo.SampleBy24(toQuery)
-		fmt.Printf("[enrich] sampling by /24: %d addresses to query\n", len(toQuery))
+		fmt.Printf("[enrich] muestreo por /24: %d direcciones a consultar\n", len(toQuery))
 	}
 
 	start := time.Now()
@@ -59,7 +60,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("[enrich] %d/%d geolocated in %s\n", len(infos), len(toQuery), time.Since(start).Round(time.Second))
+	fmt.Printf("[enrich] %d/%d geolocalizadas en %s\n", len(infos), len(toQuery), time.Since(start).Round(time.Second))
 
 	found := 0
 	blockInfo := make(map[string]geo.OnlineInfo)
@@ -105,8 +106,8 @@ func main() {
 			cities[info.City]++
 		}
 	}
-	fmt.Printf("[enrich] wrote %s (%d records enriched)\n", *out, found)
-	fmt.Printf("[enrich] cities: %s\n", topCities(cities))
+	fmt.Printf("[enrich] se escribió %s (%d registros enriquecidos)\n", *out, found)
+	fmt.Printf("[enrich] ciudades: %s\n", topCities(cities))
 }
 
 func readRecords(path string) ([]record, map[string]bool, error) {
@@ -126,7 +127,7 @@ func readRecords(path string) ([]record, map[string]bool, error) {
 		}
 		var r record
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			return nil, nil, fmt.Errorf("line %q: %w", first80(line), err)
+			return nil, nil, fmt.Errorf("línea %q: %w", first80(line), err)
 		}
 		if ip := net.ParseIP(r.IP); ip != nil && !geo.IsPrivate(ip.To4()) {
 			unique[r.IP] = true
@@ -166,7 +167,7 @@ func topCities(m map[string]int) string {
 		names = append(names, fmt.Sprintf("%s x%d", c, n))
 	}
 	if len(names) == 0 {
-		return "none"
+		return "ninguna"
 	}
 	return strings.Join(names, ", ")
 }

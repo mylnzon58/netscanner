@@ -1,7 +1,7 @@
-// Online geolocation through the free ip-api.com batch endpoint. The
-// free tier accepts up to 100 addresses per request and about 45
-// requests per minute, so LookupOnline paces itself with a pause
-// between batches.
+// Geolocalización online con el endpoint batch gratuito de ip-api.com.
+// El plan free acepta hasta 100 direcciones por pedido y unos 45 pedidos
+// por minuto, así que LookupOnline se autocontrola con una pausa entre
+// lotes.
 package geo
 
 import (
@@ -21,7 +21,7 @@ const (
 	onlinePause   = 1500 * time.Millisecond
 )
 
-// OnlineInfo is one geolocation answer from ip-api.com.
+// OnlineInfo es una respuesta de geolocalización de ip-api.com.
 type OnlineInfo struct {
 	Status      string  `json:"status"`
 	Message     string  `json:"message"`
@@ -37,9 +37,9 @@ type OnlineInfo struct {
 	AS          string  `json:"as"`
 }
 
-// SampleBy24 reduces ips to one representative address per /24 block,
-// excluding private addresses. Representatives are stable (sorted) so
-// repeated runs produce the same queries.
+// SampleBy24 reduce ips a una dirección representativa por bloque /24,
+// descartando las privadas. Los representantes son estables (ordenados)
+// así las corridas repetidas hacen las mismas consultas.
 func SampleBy24(ips []string) []string {
 	seen := make(map[uint32]bool)
 	out := make([]string, 0, len(ips)/2)
@@ -59,10 +59,10 @@ func SampleBy24(ips []string) []string {
 	return out
 }
 
-// LookupOnline geolocates ips through the free ip-api.com batch
-// endpoint. It returns a map keyed by the queried address; entries with
-// Status "fail" or missing coords are omitted. A pause is kept between
-// requests to respect the free tier rate limit.
+// LookupOnline geolocaliza ips con el endpoint batch gratuito de
+// ip-api.com. Devuelve un mapa con las direcciones consultadas; las que
+// responden Status "fail" o sin coordenadas se omiten. Se mantiene una
+// pausa entre pedidos para respetar el límite del plan free.
 func LookupOnline(ips []string) (map[string]OnlineInfo, error) {
 	infos := make(map[string]OnlineInfo)
 	client := &http.Client{Timeout: onlineTimeout}
@@ -92,8 +92,8 @@ func LookupOnline(ips []string) (map[string]OnlineInfo, error) {
 	return infos, nil
 }
 
-// LookupMyIP resolves the caller's own public address with the
-// ip-api.com json endpoint, used to identify the local ISP.
+// LookupMyIP resuelve la dirección pública del propio equipo con el
+// endpoint json de ip-api.com; sirve para identificar el ISP local.
 func LookupMyIP() (OnlineInfo, error) {
 	client := &http.Client{Timeout: onlineTimeout}
 	resp, err := client.Get("http://ip-api.com/json/")
@@ -139,9 +139,9 @@ func postBatch(client *http.Client, part []map[string]string) ([]OnlineInfo, err
 			return out, nil
 		}
 		if attempt == 1 {
-			return nil, fmt.Errorf("ip-api status %d: %s", resp.StatusCode, body)
+			return nil, fmt.Errorf("ip-api respondió %d: %s", resp.StatusCode, body)
 		}
 		time.Sleep(onlinePause)
 	}
-	return nil, fmt.Errorf("ip-api unreachable")
+	return nil, fmt.Errorf("ip-api no responde")
 }

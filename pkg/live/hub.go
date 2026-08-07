@@ -7,13 +7,13 @@ import (
 	"netscanner/pkg/exporter"
 )
 
-// Client is a single browser session subscribed to the record stream.
+// Client es una sesión de navegador suscrita al flujo de resultados.
 type Client struct {
 	ch chan []byte
 }
 
-// Hub keeps the recent history of results and broadcasts every new
-// record to all subscribed clients.
+// Hub mantiene el historial reciente de resultados y difunde cada
+// registro nuevo a todos los clientes suscriptos.
 type Hub struct {
 	mu      sync.Mutex
 	clients map[*Client]struct{}
@@ -21,12 +21,12 @@ type Hub struct {
 	limit   int
 }
 
-// NewHub creates a hub keeping at most limit records in memory.
+// NewHub crea un hub que conserva como máximo limit registros en memoria.
 func NewHub(limit int) *Hub {
 	return &Hub{clients: make(map[*Client]struct{}), limit: limit}
 }
 
-// Add appends a record to the history and broadcasts it to every client.
+// Add agrega un registro al historial y lo difunde a cada cliente.
 func (h *Hub) Add(rec exporter.Result) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -46,7 +46,7 @@ func (h *Hub) Add(rec exporter.Result) {
 	}
 }
 
-// Snapshot returns the whole in-memory history as JSON.
+// Snapshot devuelve todo el historial en memoria como JSON.
 func (h *Hub) Snapshot() []byte {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -54,7 +54,7 @@ func (h *Hub) Snapshot() []byte {
 	return data
 }
 
-// Subscribe registers a new client and returns its event channel.
+// Subscribe registra un cliente nuevo y devuelve su canal de eventos.
 func (h *Hub) Subscribe() (*Client, <-chan []byte) {
 	c := &Client{ch: make(chan []byte, 512)}
 	h.mu.Lock()
@@ -63,7 +63,7 @@ func (h *Hub) Subscribe() (*Client, <-chan []byte) {
 	return c, c.ch
 }
 
-// Unsubscribe removes a client from the broadcast list.
+// Unsubscribe saca un cliente de la lista de difusión.
 func (h *Hub) Unsubscribe(c *Client) {
 	h.mu.Lock()
 	delete(h.clients, c)

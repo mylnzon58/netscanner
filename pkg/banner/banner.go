@@ -1,6 +1,6 @@
-// Package banner extracts service fingerprints from freshly opened TCP
-// connections: an HTTP probe for web ports and a raw banner read for
-// the remaining ones.
+// Package banner extrae la "huella" de un servicio: para los puertos
+// web lanza un request HTTP y analiza la respuesta, y para el resto
+// lee el banner que el servicio manda al conectarse.
 package banner
 
 import (
@@ -14,15 +14,15 @@ import (
 	"time"
 )
 
-// MaxRead is the maximum number of bytes read from a connection.
+// MaxRead es el máximo de bytes que se leen de una conexión.
 const MaxRead = 4096
 
-// UserAgent is the HTTP User-Agent sent by the probes. It is neutral by
-// default so target servers cannot fingerprint the scanner.
+// UserAgent es el User-Agent HTTP que mandan los sondeos. Es neutro a
+// propósito: los servidores no pueden deducir que es un escáner.
 var UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 
-// DialTCP opens a TCP connection; it can be replaced to route probes
-// through a SOCKS5 proxy (used by FTPList too).
+// DialTCP abre una conexión TCP. Se puede reemplazar para mandar los
+// sondeos por un proxy SOCKS5 (FTPList también lo usa).
 var DialTCP = func(addr string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout("tcp", addr, timeout)
 }
@@ -41,7 +41,7 @@ var (
 	}
 )
 
-// Info describes what was learned from an open port.
+// Info guarda todo lo que se aprendió de un puerto abierto.
 type Info struct {
 	IsHTTP     bool
 	StatusCode int
@@ -55,13 +55,13 @@ type Info struct {
 	DAVBody    string
 }
 
-// IsWebPort reports whether the port should be probed with HTTP.
+// IsWebPort dice si el puerto se sondea con HTTP.
 func IsWebPort(port int) bool { return webPorts[port] }
 
-// Probe inspects an open connection. For web ports it sends an HTTP
-// request and parses the response; otherwise it just reads the welcome
-// banner. maxBody is the maximum bytes captured for the HTTP body (0
-// falls back to MaxRead). The connection must already have a deadline.
+// Probe inspecciona una conexión abierta: para puertos web manda un
+// request HTTP y parsea la respuesta, y para el resto lee el banner de
+// bienvenida. maxBody limita los bytes capturados del cuerpo (0 usa
+// MaxRead). La conexión ya debe tener deadline.
 func Probe(conn net.Conn, ip string, port int, maxBody int) Info {
 	if IsWebPort(port) {
 		return probeHTTP(conn, ip, maxBody)
@@ -90,14 +90,14 @@ func readRaw(conn net.Conn) Info {
 	return Info{Raw: strings.TrimSpace(sanitize(readBounded(conn, MaxRead)))}
 }
 
-// FTPInfo reports the result of an anonymous FTP login attempt.
+// FTPInfo guarda el resultado del intento de login FTP anónimo.
 type FTPInfo struct {
 	Banner string
-	Auth   string // "", "anonymous" or "denied"
+	Auth   string // "", "anonymous" o "denied"
 }
 
-// ProbeFTP reads the welcome banner and attempts an anonymous login
-// (USER/PASS anonymous). The connection must already have a deadline.
+// ProbeFTP lee el banner de bienvenida e intenta un login anónimo
+// (USER/PASS anonymous). La conexión ya debe tener deadline.
 func ProbeFTP(conn net.Conn) FTPInfo {
 	fi := FTPInfo{}
 	br := bufio.NewReader(conn)
@@ -131,11 +131,11 @@ func ProbeFTP(conn net.Conn) FTPInfo {
 	return fi
 }
 
-// ProbeDAV issues a PROPFIND request against the web server and reports
-// whether it answered 207 Multi-Status, i.e. WebDAV is enabled. The
-// response body (directory listing XML) is returned for the panel.
+// ProbeDAV manda un PROPFIND al servidor web y avisa si respondió 207
+// Multi-Status, o sea que WebDAV está habilitado. Devuelve también el
+// cuerpo de la respuesta (el listado de archivos en XML) para el panel.
 func ProbeDAV(conn net.Conn, host string) (bool, string) {
-	req := fmt.Sprintf("PROPFIND / HTTP/1.1\r\nHost: %s\r\nDepth: 1\r\nUser-Agent: NetScanner/1.0\r\nConnection: close\r\n\r\n", host)
+	req := fmt.Sprintf("PROPFIND / HTTP/1.1\r\nHost: %s\r\nDepth: 1\r\nUser-Agent: %s\r\nConnection: close\r\n\r\n", host, UserAgent)
 	if _, err := conn.Write([]byte(req)); err != nil {
 		return false, ""
 	}
@@ -146,7 +146,7 @@ func ProbeDAV(conn net.Conn, host string) (bool, string) {
 	return false, ""
 }
 
-// readBounded reads up to limit bytes, stopping at EOF, error or deadline.
+// readBounded lee hasta limit bytes, parando en EOF, error o deadline.
 func readBounded(conn net.Conn, limit int) string {
 	br := bufio.NewReaderSize(conn, MaxRead)
 	buf := make([]byte, MaxRead)
@@ -170,7 +170,7 @@ func truncate(s string, n int) string {
 	return s[:n]
 }
 
-// sanitize drops control bytes and DEL while preserving UTF-8 text.
+// sanitize elimina bytes de control y DEL conservando el texto UTF-8.
 func sanitize(s string) string {
 	return strings.Map(func(r rune) rune {
 		if (r >= 32 && r != 127) || r == '\n' || r == '\t' || r == '\r' {
@@ -182,9 +182,9 @@ func sanitize(s string) string {
 
 var pasvRe = regexp.MustCompile(`\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)`)
 
-// FTPList opens an anonymous FTP session and returns the file names of
-// the current directory. It returns an error if the server does not
-// accept anonymous logins or passive mode is not available.
+// FTPList abre una sesión FTP anónima y devuelve los nombres de archivo
+// del directorio actual. Fallo si el servidor no acepta anónimos o si
+// no hay modo pasivo.
 func FTPList(ip string, port int, timeout time.Duration) ([]string, error) {
 	conn, err := DialTCP(net.JoinHostPort(ip, strconv.Itoa(port)), timeout)
 	if err != nil {
@@ -203,26 +203,26 @@ func FTPList(ip string, port int, timeout time.Duration) ([]string, error) {
 		return reply()
 	}
 	if l := reply(); !strings.HasPrefix(l, "220") {
-		return nil, fmt.Errorf("unexpected banner: %s", l)
+		return nil, fmt.Errorf("banner inesperado: %s", l)
 	}
 	if l := cmd("USER anonymous"); !strings.HasPrefix(l, "331") && !strings.HasPrefix(l, "230") {
-		return nil, fmt.Errorf("anonymous rejected: %s", l)
+		return nil, fmt.Errorf("anónimo rechazado: %s", l)
 	}
 	if l := cmd("PASS anonymous@"); !strings.HasPrefix(l, "230") {
-		return nil, fmt.Errorf("login denied: %s", l)
+		return nil, fmt.Errorf("login denegado: %s", l)
 	}
 	_ = cmd("TYPE I")
 	l := cmd("PASV")
 	m := pasvRe.FindStringSubmatch(l)
 	if !strings.HasPrefix(l, "227") || len(m) != 7 {
-		return nil, fmt.Errorf("PASV unavailable: %s", l)
+		return nil, fmt.Errorf("PASV no disponible: %s", l)
 	}
 	p1, _ := strconv.Atoi(m[5])
 	p2, _ := strconv.Atoi(m[6])
 	dataAddr := net.JoinHostPort(m[1]+"."+m[2]+"."+m[3]+"."+m[4], strconv.Itoa(p1*256+p2))
 	dc, err := net.DialTimeout("tcp", dataAddr, timeout)
 	if err != nil {
-		return nil, fmt.Errorf("PASV data channel: %w", err)
+		return nil, fmt.Errorf("canal de datos PASV: %w", err)
 	}
 	defer dc.Close()
 	_ = dc.SetDeadline(time.Now().Add(timeout))
@@ -232,7 +232,7 @@ func FTPList(ip string, port int, timeout time.Duration) ([]string, error) {
 	}
 	data, err := io.ReadAll(io.LimitReader(dc, 1<<20))
 	if err != nil {
-		return nil, fmt.Errorf("reading listing: %w", err)
+		return nil, fmt.Errorf("leyendo el listado: %w", err)
 	}
 	_ = cmd("QUIT")
 
