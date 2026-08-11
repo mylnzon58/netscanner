@@ -95,6 +95,21 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "falta el objetivo (CIDR, IP o dominio)", http.StatusBadRequest)
 		return
 	}
+	// Se valida el objetivo ANTES de tocar los resultados: un CIDR
+	// mal escrito no debe borrar lo que ya había escaneado.
+	if parsed, _, err := net.ParseCIDR(req.Cidr); err != nil || parsed == nil {
+		parts := strings.Split(req.Cidr, "/")
+		if len(parts) > 1 {
+			http.Error(w, "el objetivo no es un CIDR válido (ej: 192.168.1.0/24, o un dominio)", http.StatusBadRequest)
+			return
+		}
+		if net.ParseIP(parts[0]) == nil {
+			if _, err := net.LookupHost(parts[0]); err != nil {
+				http.Error(w, "no se pudo resolver el objetivo: "+req.Cidr, http.StatusBadRequest)
+				return
+			}
+		}
+	}
 	if req.Ports == "" {
 		req.Ports = "80,443,8080,8000,554,21,22,5000,5001"
 	}
