@@ -6,6 +6,7 @@
 *.jsonl
 *.csv
 scan_stats.json
+*.stats
 GeoLite2-*.mmdb
 
 # Local Tor bundle (installed by anon.ps1)
