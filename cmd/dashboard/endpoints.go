@@ -38,6 +38,7 @@ var scanState struct {
 	log   []string
 	busy  bool
 	start time.Time
+	file  string
 }
 
 const scanLogMax = 300
@@ -67,6 +68,7 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 	scanState.busy = true
 	scanState.run = nil
 	scanState.log = nil
+	scanState.file = ""
 	scanState.start = time.Now()
 	scanState.mu.Unlock()
 
@@ -124,15 +126,25 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		req.Timeout = 1500
 	}
 	if req.Output == "" {
-		req.Output = a.tailer.Path()
+		// Cada escaneo del panel escribe a su propio archivo con
+		// fecha y hora; los resultados anteriores nunca se borran.
+		base := a.tailer.Path()
+		ext := filepath.Ext(base)
+		req.Output = strings.TrimSuffix(base, ext) + "-" + time.Now().Format("20060102-150405") + ext
 	}
 
 	if err := os.Truncate(req.Output, 0); err != nil && !os.IsNotExist(err) {
 		http.Error(w, fmt.Sprintf("no se pudo limpiar %s: %v", req.Output, err), http.StatusInternalServerError)
 		return
 	}
-	a.tailer.Rewind()
+	if err := a.tailer.Switch(req.Output); err != nil {
+		http.Error(w, fmt.Sprintf("no se pudo abrir %s: %v", req.Output, err), http.StatusInternalServerError)
+		return
+	}
 	a.hub.Reset()
+	scanState.mu.Lock()
+	scanState.file = req.Output
+	scanState.mu.Unlock()
 
 	args := []string{
 		"-c", req.Cidr,
@@ -226,6 +238,7 @@ func (a *app) handleScanStatus(w http.ResponseWriter, r *http.Request) {
 		"busy":  scanState.busy,
 		"log":   scanState.log,
 		"since": scanState.start,
+		"file":  scanState.file,
 	}
 	// El escáner escribe su progreso en vivo a este archivo; se lo
 	// reenvía al panel para dibujar la barra de avance.

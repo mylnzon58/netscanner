@@ -45,6 +45,9 @@
   .rngcard .m { color: #9aa7bd; margin-top: 3px; }
   .rngcard .chips { margin-top: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 10px; padding: 8px 16px; }
+  details.panel { padding: 6px 16px 12px; }
+  details.panel summary { cursor: pointer; color: #9aa7bd; font-size: 13px; padding: 6px 0; user-select: none; }
+  details.panel summary:hover { color: #c8d2e3; }
   .chart { background: #161a22; border: 1px solid #262d3a; border-radius: 8px; padding: 12px 14px; }
   .chart h3 { margin: 0 0 10px; font-size: 13px; color: #9aa7bd; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
   .chart .sub { font-size: 11px; color: #5b6472; margin: -6px 0 10px; }
@@ -333,7 +336,9 @@
   <div id="mapMsg">cargando mapa…</div>
   <div class="rngrow" id="rngCards"></div>
 </div>
-<div class="grid">
+<details class="panel">
+  <summary>📊 Analítica y filtros</summary>
+  <div class="grid">
   <div class="chart"><h3>Puertos más abiertos</h3><div class="sub">Distribución de servicios encontrados</div><div id="chPorts"></div></div>
   <div class="chart"><h3>Tipos de dispositivo</h3><div class="sub">Clasificación automática por banner y título</div><div id="chTypes"></div><div class="legend" id="legTypes"></div></div>
   <div class="chart"><h3>Rangos con más datos</h3><div class="sub">Subredes /24 con más puertos abiertos (top 8)</div><div id="chRanges"></div></div>
@@ -343,7 +348,15 @@
   <div class="chart"><h3>⏱️ Timeline de descubrimiento</h3><div class="sub">Puertos e IPs nuevas por minuto durante el escaneo</div><div id="chTime"></div></div>
   <div class="chart"><h3>🔥 Heatmap rango × puerto</h3><div class="sub">Qué servicio domina en cada rango del proveedor (intensidad = cantidad)</div><div id="chHeat"></div></div>
   <div class="chart"><h3>🔍 Análisis de contenido</h3><div class="sub">Palabras en títulos y archivos expuestos en listados</div><div id="chWords"></div></div>
-</div>
+  </div>
+  <div class="controls">
+    <select id="fPort"><option value="">todos los puertos</option></select>
+    <select id="fHttp"><option value="">cualquier estado</option><option>200</option><option>301</option><option>302</option><option>308</option><option>0</option></select>
+    <select id="fType"><option value="">todos los tipos</option></select>
+    <select id="fRng"><option value="">todos los rangos</option><option value="otras">otras</option></select>
+    <select id="fCity"><option value="">todas las ciudades</option></select>
+  </div>
+</details>
 <div class="devsec">
   <h2>🖥️ Dispositivos destacados</h2>
   <div class="sub">IPs con más servicios y contenido expuesto · botón ver abre el visor</div>
@@ -351,11 +364,6 @@
 </div>
 <div class="controls">
   <input id="q" type="search" placeholder="buscar por IP, servidor, título, ciudad…">
-  <select id="fPort"><option value="">todos los puertos</option></select>
-  <select id="fHttp"><option value="">cualquier estado</option><option>200</option><option>301</option><option>302</option><option>308</option><option>0</option></select>
-  <select id="fType"><option value="">todos los tipos</option></select>
-  <select id="fRng"><option value="">todos los rangos</option><option value="otras">otras</option></select>
-  <select id="fCity"><option value="">todas las ciudades</option></select>
   <button id="export">⬇ exportar CSV</button>
   <button id="clear">limpiar vista</button>
 </div>

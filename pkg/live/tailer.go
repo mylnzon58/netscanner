@@ -44,6 +44,28 @@ func (t *Tailer) Rewind() {
 	t.mu.Unlock()
 }
 
+// Switch deja de seguir el archivo actual y empieza a seguir otro desde
+// el final. Si no existe, lo crea. Los resultados anteriores del archivo
+// viejo quedan intactos.
+func (t *Tailer) Switch(path string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return fmt.Errorf("abriendo %s: %w", path, err)
+	}
+	off, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		_ = f.Close()
+		return err
+	}
+	old := t.file
+	t.file = f
+	t.path = path
+	t.offset = off
+	return old.Close()
+}
+
 // Read devuelve los registros agregados desde la llamada anterior. Las
 // líneas que no son JSON válido se saltan.
 func (t *Tailer) Read() ([]exporter.Result, error) {
