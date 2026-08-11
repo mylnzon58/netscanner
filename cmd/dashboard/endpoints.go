@@ -260,16 +260,22 @@ func (a *app) handleSuggest(w http.ResponseWriter, r *http.Request) {
 				ones, _ := ipnet.Mask.Size()
 				if ones < 24 {
 					ipnet.Mask = net.CIDRMask(24, 32)
+					ones = 24
 				}
-				red := ipnet.String()
+				// Se muestra la red base (192.168.1.0/24), no la IP del host.
+				base := make(net.IP, len(ip4))
+				for i := 0; i < 4; i++ {
+					base[i] = ip4[i] & ipnet.Mask[i]
+				}
+				red := fmt.Sprintf("%s/%d", base.To4(), ones)
 				if seen[red] {
 					continue
 				}
 				seen[red] = true
 				out = append(out, item{
-					Label: "Tu red local (" + red + ")",
+					Label: "Tu red local " + red,
 					Value: red,
-					Hint:  "routers, cámaras, NAS, impresoras, PC",
+					Hint:  "todo lo de tu casa: routers, cámaras, NAS, impresoras, PCs",
 				})
 			}
 		}
@@ -277,16 +283,16 @@ func (a *app) handleSuggest(w http.ResponseWriter, r *http.Request) {
 
 	if info, err := geo.LookupMyIP(); err == nil && info.Query != "" {
 		out = append(out, item{
-			Label: "Tu IP pública (" + info.Query + ")",
+			Label: "Tu IP pública " + info.Query,
 			Value: info.Query + "/32",
-			Hint:  info.ISP + " · " + info.City,
+			Hint:  "qué puertos tenés abiertos hacia internet (suele estar vacío)",
 		})
 	}
 
 	out = append(out, item{
 		Label: "Un dominio o web",
 		Value: "",
-		Hint:  "escribí algo como ejemplo.com y lo escaneo",
+		Hint:  "cualquier sitio: escribí ejemplo.com y lo analizo",
 	})
 
 	w.Header().Set("Content-Type", "application/json")
