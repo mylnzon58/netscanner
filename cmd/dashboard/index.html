@@ -188,6 +188,9 @@
   #scanGo { background: #2a3550; border: 1px solid #3b4a6b; color: #c8d2e3; padding: 8px 18px; font-size: 13px; }
   #scanGo:hover { background: #33406a; }
   #scanStop { display: none; background: #3a2020; border: 1px solid #5a3030; color: #ff8f8f; }
+  .scanbar { margin-top: 12px; background: #0d0f14; border: 1px solid #1d232f; border-radius: 8px; height: 14px; overflow: hidden; }
+  .scanbar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2a5aa0, #4a8fd0); transition: width .4s ease; }
+  #scanBarTxt { margin-top: 5px; font-size: 12px; }
   .scanlog { margin-top: 12px; background: #0d0f14; border: 1px solid #1d232f; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #9aa7bd; max-height: 220px; overflow: auto; white-space: pre-wrap; font-family: Consolas, monospace; display: none; }
   .scanlog .l { display: block; }
   .scanlog .s { color: #7ddfa0; }
@@ -235,6 +238,10 @@
       <button id="scanStop">⏹ Detener</button>
       <span class="muted2" id="scanHint"></span>
     </div>
+    <div class="scanbar" id="scanBarWrap" style="display:none">
+      <div class="scanbar-fill" id="scanBarFill"></div>
+    </div>
+    <div class="muted2" id="scanBarTxt"></div>
     <div class="scanlog" id="scanLog"></div>
   </div>
 </div>
@@ -1536,6 +1543,9 @@ function startScan() {
   };
   $("scanLog").style.display = "block";
   $("scanLog").innerHTML = '<span class="l s">▶ lanzando escaneo de ' + esc(cidr) + "…</span>";
+  $("scanBarWrap").style.display = "block";
+  $("scanBarFill").style.width = "0%";
+  $("scanBarTxt").textContent = "preparando escaneo…";
   $("scanStop").style.display = "inline-block";
   $("scanGo").disabled = true;
   fetch("/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
@@ -1558,11 +1568,19 @@ function stopScan() {
 function pollScanStatus() {
   fetch("/scanstatus").then(r => r.json()).then(s => {
     if (!s) return;
-    if (s.busy) {
+    const st = s.stats;
+    if (s.busy || (scanRunning && st)) {
       scanRunning = true;
       $("scanStop").style.display = "inline-block";
       $("scanGo").disabled = true;
       $("scanLog").style.display = "block";
+      if (st && st.total) {
+        const done = st.attempts > st.total ? st.total : st.attempts;
+        const pct = Math.round(done / st.total * 100);
+        $("scanBarWrap").style.display = "block";
+        $("scanBarFill").style.width = pct + "%";
+        $("scanBarTxt").textContent = "probando " + done + " de " + st.total + " · " + st.open + " abiertos (" + pct + "%)";
+      }
       const logEl = $("scanLog");
       const last = logEl.lastChild ? logEl.lastChild.textContent : "";
       const lines = (s.log || []).filter(l => l && last !== l);
@@ -1572,6 +1590,10 @@ function pollScanStatus() {
       scanRunning = false;
       $("scanStop").style.display = "none";
       $("scanGo").disabled = false;
+      if (st && st.total) {
+        $("scanBarFill").style.width = "100%";
+        $("scanBarTxt").textContent = "listo: " + st.open + " puertos abiertos de " + st.total + " probados";
+      }
       $("scanLog").innerHTML += '<span class="l s">✓ escaneo finalizado</span>';
     }
   }).catch(() => {});

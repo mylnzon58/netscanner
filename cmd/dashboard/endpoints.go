@@ -26,6 +26,10 @@ type app struct {
 	hub    *live.Hub
 }
 
+// statsPath devuelve dónde escribe el escáner su progreso en vivo,
+// al lado del archivo que vigila el panel.
+func (a *app) statsPath() string { return a.tailer.Path() + ".stats" }
+
 // ---- escaneo desde el panel ----
 
 var scanState struct {
@@ -136,7 +140,7 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		"-w", fmt.Sprint(req.Workers),
 		"-t", fmt.Sprint(req.Timeout),
 		"-o", req.Output,
-		"--stats", "scan_stats.json",
+		"--stats", a.statsPath(),
 	}
 	if req.Proxy != "" {
 		args = append(args, "--proxy", req.Proxy)
@@ -218,11 +222,20 @@ func (a *app) handleScanStatus(w http.ResponseWriter, r *http.Request) {
 	scanState.mu.Lock()
 	defer scanState.mu.Unlock()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	resp := map[string]interface{}{
 		"busy":  scanState.busy,
 		"log":   scanState.log,
 		"since": scanState.start,
-	})
+	}
+	// El escáner escribe su progreso en vivo a este archivo; se lo
+	// reenvía al panel para dibujar la barra de avance.
+	var s map[string]uint64
+	if data, err := os.ReadFile(a.statsPath()); err == nil {
+		if err := json.Unmarshal(data, &s); err == nil && len(s) > 0 {
+			resp["stats"] = s
+		}
+	}
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // ---- propuestas de escaneo ----
