@@ -163,13 +163,20 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 	scanState.log = nil
 	scanState.file = ""
 	scanState.start = time.Now()
-	scanState.mu.Unlock()
-
+	// Si algo falla antes de lanzar el proceso, se libera busy acá;
+	// si el proceso arrancó, el busy lo libera la goroutine que espera
+	// a que termine (el escaneo sigue "en curso" aunque el handler ya
+	// haya respondido).
+	scanStarted := false
 	defer func() {
+		if scanStarted {
+			return
+		}
 		scanState.mu.Lock()
 		scanState.busy = false
 		scanState.mu.Unlock()
 	}()
+	scanState.mu.Unlock()
 
 	var req struct {
 		Cidr    string `json:"cidr"`
@@ -302,6 +309,7 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("no se pudo lanzar netscanner.exe: %v", err), http.StatusInternalServerError)
 		return
 	}
+	scanStarted = true
 	scanState.mu.Lock()
 	scanState.run = cmd
 	scanState.mu.Unlock()
@@ -310,6 +318,7 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		_ = cmd.Wait()
 		scanState.mu.Lock()
 		scanState.run = nil
+		scanState.busy = false
 		scanState.mu.Unlock()
 	}()
 
@@ -348,10 +357,18 @@ func (a *app) handleScanStatus(w http.ResponseWriter, r *http.Request) {
 		"file":  scanState.file,
 	}
 	// El escáner escribe su progreso en vivo a este archivo; se lo
-	// reenvía al panel para dibujar la barra de avance.
-	var s map[string]uint64
+	// reenvía al panel para dibujar la barra de avance y la traza.
+	var s struct {
+		Total    uint64   `json:"total"`
+		Attempts uint64   `json:"attempts"`
+		Open     uint64   `json:"open"`
+		Timeouts uint64   `json:"timeouts"`
+		Errors   uint64   `json:"errors"`
+		Sample   []string `json:"sample"`
+		Last     string   `json:"last"`
+	}
 	if data, err := os.ReadFile(a.statsPath()); err == nil {
-		if err := json.Unmarshal(data, &s); err == nil && len(s) > 0 {
+		if err := json.Unmarshal(data, &s); err == nil && (s.Total > 0 || len(s.Sample) > 0) {
 			resp["stats"] = s
 		}
 	}

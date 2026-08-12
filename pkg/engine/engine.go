@@ -157,7 +157,10 @@ func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- ex
 		stats = shared
 	}
 	jobCount := hosts * uint64(len(opts.Ports))
-	stats.TotalJob.Add(jobCount)
+	if shared == nil {
+		// Sin contadores compartidos, el total es el de esta corrida.
+		stats.TotalJob.Add(jobCount)
+	}
 	workers := opts.Workers
 	if uint64(workers) > jobCount {
 		workers = int(jobCount)

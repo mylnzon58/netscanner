@@ -127,6 +127,18 @@ func main() {
 
 	var final engine.Snapshot
 	shared := &engine.Stats{}
+	// Se precarga el total de trabajos de TODOS los objetivos: el
+	// progreso en vivo muestra un solo total desde el primer momento.
+	for _, cidr := range cidrs {
+		_, ipnet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		if h, err := engine.HostCount(ipnet); err == nil {
+			shared.TotalJob.Add(h * uint64(len(opts.Ports)))
+		}
+	}
 	for _, cidr := range cidrs {
 		opts.CIDR = cidr
 		if _, err := engine.Run(ctx, opts, db, exp.Results(), shared); err != nil {
