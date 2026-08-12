@@ -1,13 +1,13 @@
 # deploy.ps1 - compila todo y despliega el servidor del panel en
 # Windows, abriendo el navegador automáticamente.
 $ErrorActionPreference = "Stop"
-Set-Location $PSScriptRoot
+Set-Location (Split-Path $PSScriptRoot -Parent)
 
-.\build.ps1
+& .\scripts\build.ps1
 
 Get-Process dashboard -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 1
-Start-Process -FilePath ".\dashboard.exe" -ArgumentList "-file", "casa.jsonl" -WindowStyle Hidden
+Start-Process -FilePath ".\dashboard.exe" -ArgumentList "-file", "data\casa.jsonl" -WindowStyle Hidden
 Start-Sleep -Seconds 2
 
 Start-Process "http://127.0.0.1:8080"

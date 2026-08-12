@@ -24,7 +24,7 @@ pkg/banner ── puertos web (80,443,8080,8000): GET / HTTP/1.1 + parseo de
 pkg/geo ──── RFC 1918 → "Internal/Private"; públicas → consulta local
    │          GeoLite2 (.mmdb) → País, Ciudad, Lat, Lon; sin DB → "Unknown"
    ▼
-pkg/exporter ─ canal asíncrono + goroutine I/O única → results.jsonl
+pkg/exporter ─ canal asíncrono + goroutine I/O única → data/*.jsonl (local, gitignored)
 ```
 
 ### Flujo de datos
@@ -48,7 +48,7 @@ Bandera | Corta | Default | Descripción
 `--workers` | `-w` | `500` | Conexiones concurrentes máximas (límite del pool).
 `--timeout` | `-t` | `2000` | Timeout de conexión en milisegundos.
 `--geoip` | `-g` | `./GeoLite2-City.mmdb` | Ruta a la base MaxMind GeoLite2 City.
-`--output` | `-o` | `results.jsonl` | Archivo de salida JSONL.
+`--output` | `-o` | `results.jsonl` | Archivo de salida JSONL (el panel y los scripts usan `data/*.jsonl`, que está gitignored).
 
 Validaciones: CIDR IPv4 obligatorio, puertos únicos y en rango, workers ≥ 1, timeout ≥ 10 ms. Con `-h` se imprime la ayuda. Solo se soporta IPv4 en el MVP (los CIDR IPv6 se rechazan con un error explícito).
 
@@ -121,3 +121,17 @@ Validaciones: CIDR IPv4 obligatorio, puertos únicos y en rango, workers ≥ 1, 
 ## 7. Uso ético y legal
 
 Escanea únicamente redes propias o con autorización explícita. El escaneo no autorizado puede violar leyes locales y términos de servicio de terceros. El operador es responsable del uso.
+
+## 8. Privacidad del repositorio
+
+- El repo público contiene **solo código**: `cmd/`, `pkg/`, `scripts/`, `docs/`, `Makefile`, workflows y raíz. Todo dato de escaneos (`.jsonl`), progreso (`.stats`), `geo-cache.json`, `comments.json` y `ai_key.json` vive en `data/`, excluido por `.gitignore` (`data/`, `*.jsonl`, `*.stats`, …).
+- Los ejemplos del README/GUIA y la documentación usan exclusivamente IPs de documentación (RFC 5737) y ASN ficticios (`AS64500`).
+- El job de CI `privacy` falla si `git ls-files` contiene archivos de datos fuera de los directorios permitidos (`^(cmd|pkg|scripts|docs|\.github|README\.md|LICENSE|Makefile|go\.mod|go\.sum|\.gitignore)$`).
+
+## 9. Panel: histórico, reset y pausa (dashboard)
+
+- `GET /histories` — lista los `data/*.jsonl` disponibles (nombre, tamaño, fecha) para el selector del hero.
+- `POST /history/load` — reabre un histórico guardado sin reescanear: valida el nombre (sin `..` ni subdirectorios), rechaza con 409 si hay un escaneo en curso, hace switch del tailer al archivo, resetea el hub (`ResetAll`) y reenvía todos los registros por SSE (`event: reset` + snapshot).
+- Al lanzar un escaneo nuevo, `/scan` hace `hub.ResetAll()` y guarda el resultado en un archivo datado `data/<prefijo>-YYYYMMDD-HHMMSS.jsonl` (nunca pisa históricos).
+- Preflight `checkReachability`: si el objetivo es público o `asn:`, se intenta obtener la IP/geo propia (`geo.LookupMyIP`); si falla (sin conexión), `/scan` responde 503 con "sin conexión a internet (no se pudo obtener tu IP/geo…)" y el escaneo se pausa en vez de sondear a ciegas.
+- SSE: los eventos del hub se envían como `event: <nombre>` + `data: <JSON>`; el cliente limpia mapas/fichas al recibir `reset`.

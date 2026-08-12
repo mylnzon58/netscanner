@@ -30,10 +30,10 @@ run:
 	$(GO) run ./cmd/scanner --cidr 127.0.0.1/32 --ports 80,443 --workers 16 --timeout 1000
 
 run-panel:
-	$(GO) run ./cmd/dashboard -file casa.jsonl
+	$(GO) run ./cmd/dashboard -file data/casa.jsonl
 
 deploy:
-	@if [ -f deploy.sh ]; then ./deploy.sh; else .\deploy.ps1; fi
+	@if [ -f scripts/deploy.sh ]; then ./scripts/deploy.sh; else .\scripts\deploy.ps1; fi
 
 test:
 	$(GO) test ./...

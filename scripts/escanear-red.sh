@@ -3,17 +3,17 @@
 # detecta la red sola, la escanea con la lista completa de puertos y
 # abre el panel con los resultados.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 if [[ ! -x ./netscanner || ! -x ./dashboard ]]; then
   echo "Compilando binarios..."
-  ./build.sh || { echo "ERROR al compilar. ¿Tenés Go instalado?" >&2; exit 1; }
+  ./scripts/build.sh || { echo "ERROR al compilar. ¿Tenés Go instalado?" >&2; exit 1; }
 fi
 
-net="$(./detectar-red.sh)" || exit 1
+net="$(./scripts/detectar-red.sh)" || exit 1
 echo "Red local detectada: $net"
 
-out="casa-local-$(date +%Y%m%d-%H%M%S).jsonl"
+out="data/casa-local-$(date +%Y%m%d-%H%M%S).jsonl"
 echo "Escaneando $net (80,443,8080,8000,554,21,22,5000,5001) ..."
 ./netscanner -c "$net" -p 80,443,8080,8000,554,21,22,5000,5001 -w 200 -t 1500 -o "$out"
 

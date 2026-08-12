@@ -15,7 +15,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$TorDir   = Join-Path $PSScriptRoot "tools\tor"
+$RepoRoot = Split-Path $PSScriptRoot -Parent
+$TorDir   = Join-Path $RepoRoot "tools\tor"
 $TorExe   = Join-Path $TorDir "tor.exe"
 $Torrc    = Join-Path $TorDir "torrc"
 $DataDir  = Join-Path $TorDir "data"
@@ -120,8 +121,8 @@ if ($probe.TcpTestSucceeded) {
     Write-Host "TOR LISTO: socks5://127.0.0.1:$SocksPort"
     Write-Host ""
     Write-Host "Ejemplos:"
-    Write-Host "  .\netscanner.exe -c 203.0.113.0/24 -p 80,443,554 -w 20 -t 5000 -o anon.jsonl --proxy socks5://127.0.0.1:$SocksPort"
-    Write-Host "  .\scan-isp.ps1 -Proxy socks5://127.0.0.1:$SocksPort"
+    Write-Host "  .\netscanner.exe -c 203.0.113.0/24 -p 80,443,554 -w 20 -t 5000 -o data\anon.jsonl --proxy socks5://127.0.0.1:$SocksPort"
+    Write-Host "  .\scripts\scan-isp.ps1 -Proxy socks5://127.0.0.1:$SocksPort"
 } else {
     Write-Host "ERROR: Tor no responde en el puerto $SocksPort. Revisa $LogFile" -ForegroundColor Red
     exit 1

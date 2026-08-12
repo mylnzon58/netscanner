@@ -54,19 +54,12 @@ func routesHosts(routes []string) uint64 {
 
 // geoCache persiste en disco las coordenadas consultadas (ip-api tiene
 // un límite de ~45 p/min sin clave), para no repetir pedidos entre
-// reinicios del panel.
+// reinicios del panel. La ruta la fija main según data/.
 var geoCache = struct {
 	mu   sync.Mutex
 	path string
 	data map[string]geo.OnlineInfo
 }{data: make(map[string]geo.OnlineInfo)}
-
-func init() {
-	if d, err := os.ReadFile("geo-cache.json"); err == nil {
-		_ = json.Unmarshal(d, &geoCache.data)
-	}
-	geoCache.path = "geo-cache.json"
-}
 
 func geoCacheSave() {
 	if len(geoCache.data) == 0 {
@@ -148,6 +141,39 @@ func (a *app) scanLog(line string) {
 
 // handleScan lanza netscanner con los parámetros que manda el panel,
 // trunca el archivo de resultados y deja que el tailer siga escribiendo.
+// checkReachability pausa el escaneo cuando no hay conexión a internet:
+// si ni siquiera se puede obtener la propia IP pública (geo), sondear
+// objetivos remotos no tiene sentido. La red local se escanea igual,
+// aunque ip-api no responda.
+func (a *app) checkReachability(cidr string) error {
+	var needsCheck bool
+	for _, part := range strings.Split(cidr, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" || strings.HasPrefix(part, "asn:") {
+			needsCheck = true
+			break
+		}
+		ip := net.ParseIP(part)
+		if ip == nil {
+			if _, ipnet, err := net.ParseCIDR(part); err == nil {
+				ip = ipnet.IP
+			}
+		}
+		if ip == nil || geo.IsPrivate(ip) {
+			continue
+		}
+		needsCheck = true
+		break
+	}
+	if !needsCheck {
+		return nil
+	}
+	if _, err := geo.LookupMyIP(); err != nil {
+		return fmt.Errorf("sin conexión a internet (no se pudo obtener tu IP/geo: %v). Revisá el router y volvé a intentar", err)
+	}
+	return nil
+}
+
 func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "método no permitido", http.StatusMethodNotAllowed)
@@ -202,6 +228,10 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "falta el objetivo (CIDR, IP o dominio)", http.StatusBadRequest)
 		return
 	}
+	if err := a.checkReachability(req.Cidr); err != nil {
+		http.Error(w, "escaneo pausado: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	target := req.Cidr
 	// "asn:XXXX" escanea todos los rangos que anuncia ese proveedor
 	// (si viene solo "asn:", se usa el ASN de la propia conexión).
@@ -243,9 +273,11 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		req.Timeout = 1500
 	}
 	if req.Output == "" {
-		// Cada escaneo del panel escribe a su propio archivo con
-		// fecha y hora; los resultados anteriores nunca se borran.
-		req.Output = a.filePrefix + "-" + time.Now().Format("20060102-150405") + ".jsonl"
+		// Cada escaneo del panel guarda su propio archivo con fecha y
+		// hora en data/: los históricos nunca se borran y se pueden
+		// volver a abrir desde el panel sin reescanear.
+		dir := filepath.Dir(a.tailer.Path())
+		req.Output = filepath.Join(dir, a.filePrefix+"-"+time.Now().Format("20060102-150405")+".jsonl")
 	}
 
 	if err := os.Truncate(req.Output, 0); err != nil && !os.IsNotExist(err) {
@@ -256,7 +288,9 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("no se pudo abrir %s: %v", req.Output, err), http.StatusInternalServerError)
 		return
 	}
-	a.hub.Reset()
+	// Objetivo nuevo: se vacía todo lo anterior en el panel y en los
+	// navegadores conectados, para que no queden resultados mezclados.
+	a.hub.ResetAll()
 	scanState.mu.Lock()
 	scanState.file = req.Output
 	scanState.mu.Unlock()
@@ -374,6 +408,97 @@ func (a *app) handleScanStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// ---- historiales guardados ----
+
+// handleHistories lista los escaneos guardados (data/*.jsonl) con su
+// tamaño y fecha, para poder reabrir uno sin volver a escanear.
+func (a *app) handleHistories(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Dir(a.tailer.Path())
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		http.Error(w, "no se pudo leer el directorio de datos: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	type hist struct {
+		Name string `json:"name"`
+		Size int64  `json:"size"`
+		At   string `json:"at"`
+	}
+	var out []hist
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil {
+			continue
+		}
+		out = append(out, hist{Name: e.Name(), Size: fi.Size(), At: fi.ModTime().Format("2006-01-02 15:04")})
+	}
+	if len(out) == 0 {
+		out = []hist{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
+}
+
+// handleHistoryLoad reabre un escaneo guardado: cambia el tailer a ese
+// archivo y vuelca todo su contenido al panel, sin escanear de nuevo.
+func (a *app) handleHistoryLoad(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+	scanState.mu.Lock()
+	busy := scanState.busy
+	scanState.mu.Unlock()
+	if busy {
+		http.Error(w, "hay un escaneo en curso: detenelo antes de abrir un histórico", http.StatusConflict)
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+	if err := json.Unmarshal(body, &req); err != nil || req.Name == "" {
+		http.Error(w, "falta el nombre del histórico", http.StatusBadRequest)
+		return
+	}
+	// Solo se permite un nombre de archivo simple dentro de data/:
+	// nada de rutas, subdirectorios ni escapes del directorio local.
+	name := filepath.Base(req.Name)
+	if name != req.Name || !strings.HasSuffix(name, ".jsonl") {
+		http.Error(w, "nombre de histórico inválido", http.StatusBadRequest)
+		return
+	}
+	path := filepath.Join(filepath.Dir(a.tailer.Path()), name)
+	if _, err := os.Stat(path); err != nil {
+		http.Error(w, "ese histórico no existe: "+name, http.StatusNotFound)
+		return
+	}
+	if err := a.tailer.Switch(path); err != nil {
+		http.Error(w, "no se pudo abrir el histórico: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	a.hub.ResetAll()
+	a.tailer.Rewind()
+	recs, err := a.tailer.Read()
+	if err == nil {
+		for _, rec := range recs {
+			a.hub.Add(rec)
+		}
+	}
+	scanState.mu.Lock()
+	scanState.file = path
+	scanState.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":      true,
+		"file":    path,
+		"records": len(recs),
+	})
 }
 
 // ---- sistema operativo del servidor ----
@@ -571,7 +696,7 @@ var aiConf = struct {
 	*aiConfig
 }{aiConfig: &aiConfig{}}
 
-const aiConfFile = "ai_key.json"
+var aiConfFile = "data/ai_key.json"
 
 func loadAIConf() {
 	if b, err := os.ReadFile(aiConfFile); err == nil {

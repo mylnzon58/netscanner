@@ -3,14 +3,16 @@ param(
     [string]$Ports = "80,443,8080,8000,554,21,22,5000,5001,8081,9000",
     [int]$Workers = 400,
     [int]$Timeout = 1500,
-    [string]$Output = "isp_total.jsonl",
-    [string]$StatsFile = "scan_stats.json",
+    [string]$Output = "data\isp_total.jsonl",
+    [string]$StatsFile = "data\isp_total.jsonl.stats",
     [int]$WebPort = 8080,
     [string]$Proxy = ""
 )
 
 $ErrorActionPreference = "Stop"
+Set-Location (Split-Path $PSScriptRoot -Parent)
 
+New-Item -ItemType Directory -Path data -Force | Out-Null
 Get-Process dashboard -ErrorAction SilentlyContinue | Stop-Process -Force
 Remove-Item $Output -ErrorAction SilentlyContinue
 Remove-Item $StatsFile -ErrorAction SilentlyContinue

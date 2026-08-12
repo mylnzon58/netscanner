@@ -85,9 +85,12 @@ func TestHubBroadcastAndSnapshot(t *testing.T) {
 	c, ch := h.Subscribe()
 	h.Add(rec("1.1.1.1", 22))
 	select {
-	case data := <-ch:
+	case f := <-ch:
+		if f.Event != "" {
+			t.Fatalf("expected record frame, got event %q", f.Event)
+		}
 		var r exporter.Result
-		if err := json.Unmarshal(data, &r); err != nil {
+		if err := json.Unmarshal(f.Data, &r); err != nil {
 			t.Fatal(err)
 		}
 		if r.Port != 22 {
@@ -104,6 +107,29 @@ func TestHubBroadcastAndSnapshot(t *testing.T) {
 		t.Error("unsubscribed client still receives events")
 	default:
 	}
+}
+
+func TestHubResetAll(t *testing.T) {
+	h := NewHub(10)
+	h.Add(rec("1.1.1.1", 80))
+	c, ch := h.Subscribe()
+	h.ResetAll()
+	var snap []exporter.Result
+	if err := json.Unmarshal(h.Snapshot(), &snap); err != nil {
+		t.Fatal(err)
+	}
+	if len(snap) != 0 {
+		t.Fatalf("history after ResetAll = %+v", snap)
+	}
+	select {
+	case f := <-ch:
+		if f.Event != "reset" {
+			t.Fatalf("expected reset event, got %q", f.Event)
+		}
+	default:
+		t.Fatal("expected reset broadcast")
+	}
+	_ = c
 }
 
 func TestHubHistoryLimit(t *testing.T) {

@@ -32,7 +32,7 @@ import (
 var indexHTML []byte
 
 func main() {
-	file := flag.String("file", "results.jsonl", "archivo JSONL de resultados a vigilar")
+	file := flag.String("file", "data/results.jsonl", "archivo JSONL de resultados a vigilar")
 	addr := flag.String("addr", "127.0.0.1:8080", "dirección de escucha del panel web")
 	limit := flag.Int("limit", 5000, "máximo de registros retenidos en memoria")
 	poll := flag.Duration("poll", 500*time.Millisecond, "intervalo de revisión del archivo")
@@ -42,6 +42,11 @@ func main() {
 
 	if *limit < 100 {
 		*limit = 100
+	}
+	// Todo lo que el panel genera (resultados, caché geo, notas, logs)
+	// vive en data/, que git ignora: nada sensible se sube al repo.
+	if d := filepath.Dir(*file); d != "" && d != "." {
+		_ = os.MkdirAll(d, 0o755)
 	}
 
 	proxy, err := socks.NewDialer(*proxySpec, 10*time.Second)
@@ -99,6 +104,15 @@ func main() {
 	loadCommentsRef := loadComments()
 	loadAIConf()
 	app := &app{tailer: tailer, hub: hub, filePrefix: filePrefix}
+	dataDir := filepath.Dir(tailer.Path())
+	// Los datos locales del panel (caché geo, notas, clave de IA, logs)
+	// van siempre junto a los resultados, en data/.
+	geoCache.path = filepath.Join(dataDir, "geo-cache.json")
+	commentsFile = filepath.Join(dataDir, "comments.json")
+	aiConfFile = filepath.Join(dataDir, "ai_key.json")
+	if d, err := os.ReadFile(geoCache.path); err == nil {
+		_ = json.Unmarshal(d, &geoCache.data)
+	}
 
 	go func() {
 		t := time.NewTicker(*poll)
@@ -150,6 +164,8 @@ func main() {
 	mux.HandleFunc("/scanstop", app.handleScanStop)
 	mux.HandleFunc("/scanstatus", app.handleScanStatus)
 	mux.HandleFunc("/suggest", app.handleSuggest)
+	mux.HandleFunc("/histories", app.handleHistories)
+	mux.HandleFunc("/history/load", app.handleHistoryLoad)
 	mux.HandleFunc("/comments", loadCommentsRef.handleGet)
 	mux.HandleFunc("/comments/set", loadCommentsRef.handleSet)
 	mux.HandleFunc("/ai/config", app.handleAIConfig)
@@ -439,8 +455,12 @@ func handleEvents(hub *live.Hub, w http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case data := <-ch:
-			fmt.Fprintf(w, "data: %s\n\n", data)
+		case f := <-ch:
+			if f.Event != "" {
+				fmt.Fprintf(w, "event: %s\ndata: %s\n\n", f.Event, f.Data)
+			} else {
+				fmt.Fprintf(w, "data: %s\n\n", f.Data)
+			}
 			flusher.Flush()
 		case <-heartbeat.C:
 			fmt.Fprint(w, ": ping\n\n")

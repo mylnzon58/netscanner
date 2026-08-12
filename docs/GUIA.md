@@ -16,26 +16,26 @@ Todo lo que se puede (y no se puede) hacer con esta herramienta, explicado simpl
 |---|---|---|---|
 | **Sin nada** | `netscanner.exe -c ...` | máxima | nada (usas tu IP) |
 | **VPN** (recomendada) | conectás tu VPN y escaneás normal | alta | tu IP (aparece la del VPN) |
-| **TOR** | `.\anon.ps1` (instala y arranca TOR solo) y usás `--proxy socks5://127.0.0.1:9050` | muy lenta | tu IP (aparece un nodo TOR) |
+| **TOR** | `.\scripts\anon.ps1` (instala y arranca TOR solo) y usás `--proxy socks5://127.0.0.1:9050` | muy lenta | tu IP (aparece un nodo TOR) |
 
 **TOR automático (no requiere instalar nada aparte)** — el script descarga el Expert Bundle oficial de Tor dentro del proyecto (`tools\tor`) y lo arranca:
 
 ```
-.\anon.ps1
+.\scripts\anon.ps1
 ```
 
 Después de ver "TOR LISTO", ya podés escanear anónimo:
 
 ```
-.\netscanner.exe -c 192.0.2.0/24 -p 80,443 -w 20 -t 5000 -o tor.jsonl --proxy socks5://127.0.0.1:9050
+.\netscanner.exe -c 192.0.2.0/24 -p 80,443 -w 20 -t 5000 -o data\tor.jsonl --proxy socks5://127.0.0.1:9050
 ```
 
-Otros subcomandos: `.\anon.ps1 -Check` (¿está corriendo?) y `.\anon.ps1 -Stop`.
+Otros subcomandos: `.\scripts\anon.ps1 -Check` (¿está corriendo?) y `.\scripts\anon.ps1 -Stop`. En macOS/Linux: `./scripts/anon.sh` con `--check` y `--stop`.
 
 **Ojo con TOR**: el escaneo masivo por TOR es *extremadamente lento* (20-50 conexiones/seg) y muchos servidores bloquean nodos TOR. Para escaneos grandes usá una VPN. El panel también puede usar el proxy:
 
 ```
-.\dashboard.exe -file tor.jsonl --proxy socks5://127.0.0.1:9050
+.\dashboard.exe -file data\tor.jsonl --proxy socks5://127.0.0.1:9050
 ```
 
 (esto anonimiza el navegador en vivo `/proxy` y el listado FTP `/ftplist`).
@@ -75,18 +75,25 @@ Para escanear un rango de otro operador de tu zona necesitás sus bloques de IP.
 - El mapa muestra **cada IP** como un punto con icono de su tipo (cámara, servidor, FTP, NAS…) y anillo del color de su rango.
 - La precisión es a **nivel ciudad** (las bases públicas no dan dirección exacta): los puntos se dispersan dentro del área de la ciudad. Un punto no es la ubicación exacta del dispositivo.
 
-## 7. Comandos rápidos
+## 7. Históricos guardados y privacidad
+
+- **Cada escaneo del panel se guarda solo** en `data/` con su fecha y hora (`data\casa-20260812-022418.jsonl`). El hero tiene un selector **📂 Históricos guardados** que los lista (nombre, tamaño, fecha): elegí uno y tocá **Abrir histórico** para **reflejarlo sin volver a escanear** (el archivo se lee tal cual está guardado).
+- Al lanzar un **objetivo nuevo**, el panel se **vacía solo** (mapa, fichas, timeline) para no mezclar escaneos; los históricos anteriores quedan intactos en `data/`.
+- **Sin conexión = pausa**: antes de escanear un objetivo público, el panel se fija si puede obtener tu IP/geo. Si no hay internet, el escaneo **se pausa** con un mensaje claro ("Revisá el router y volvé a intentar") en vez de sondear sin sentido.
+- **Regla de oro del repo**: el repositorio es solo código. Resultados (`*.jsonl`), progreso (`*.stats`), caché geo (`geo-cache.json`), notas (`comments.json`) y claves de IA (`ai_key.json`) viven en `data/`, que `.gitignore` excluye siempre: **no se suben IPs, cuentas ni webs de nadie al repo público**. El CI lo verifica y falla si aparece un archivo de datos.
+
+## 8. Comandos rápidos
 
 | Tarea | Comando |
 |---|---|
-| Tu red local | `.\netscanner.exe -c 192.168.1.0/24 -o casa.jsonl` |
-| Tu operador completo | `.\netscanner.exe -c asn: -p 80,554 -w 500 -t 600 -o operador.jsonl` (o `asn:AS64500` para otro; en el panel, un clic en "Tu operador de internet completo") |
-| Una IP suelta | `.\netscanner.exe -c 203.0.113.7/32 -p 80,443,554,21 -o ip.jsonl` |
-| Un dominio | `.\netscanner.exe -c delco-digital.com -p 80,443,8080,554 -o web.jsonl` (resuelve la IP y la escanea) |
-| Varios objetivos | `.\netscanner.exe -c 192.168.1.0/24,10.0.0.1 -p 80 -o mix.jsonl` |
-| Un rango de ISP (conocido/tuyo) | `.\netscanner.exe -c 198.51.100.0/24 -p 80,443,8080,8000,554,21,22,5000,5001 -w 400 -t 1500 -o isp.jsonl --stats scan_stats.json` |
+| Tu red local | `.\netscanner.exe -c 192.168.1.0/24 -o data\casa.jsonl` |
+| Tu operador completo | `.\netscanner.exe -c asn: -p 80,554 -w 500 -t 600 -o data\operador.jsonl` (o `asn:AS64500` para otro; en el panel, un clic en "Tu operador de internet completo") |
+| Una IP suelta | `.\netscanner.exe -c 203.0.113.7/32 -p 80,443,554,21 -o data\ip.jsonl` |
+| Un dominio | `.\netscanner.exe -c delco-digital.com -p 80,443,8080,554 -o data\web.jsonl` (resuelve la IP y la escanea) |
+| Varios objetivos | `.\netscanner.exe -c 192.168.1.0/24,10.0.0.1 -p 80 -o data\mix.jsonl` |
+| Un rango de ISP (conocido/tuyo) | `.\netscanner.exe -c 198.51.100.0/24 -p 80,443,8080,8000,554,21,22,5000,5001 -w 400 -t 1500 -o data\isp.jsonl --stats data\scan_stats.json` |
 | Anónimo por TOR | agregar `--proxy socks5://127.0.0.1:9050` (y bajar `-w` a 20-50) |
-| Ver resultados | `.\dashboard.exe -file isp.jsonl` → http://127.0.0.1:8080 |
-| Geolocalizar | `.\enrich.exe -in isp.jsonl` (genera `isp_geo.jsonl`) |
+| Ver resultados | `.\dashboard.exe -file data\isp.jsonl` → http://127.0.0.1:8080 |
+| Geolocalizar | `.\enrich.exe -in data\isp.jsonl` (genera `data\isp_geo.jsonl`) |
 
 > Los puertos `554` (RTSP), `34567` (XMEye) y `37777` (Dahua) sirven para detectar cámaras; `21` + `--ftp-ports 21` para FTP anónimo; `5000/5001` (Synology/QNAP) y `8081` (QNAP) para NAS.

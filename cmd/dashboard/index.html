@@ -250,6 +250,12 @@
       <button id="scanStop">⏹ Detener</button>
       <span class="muted2" id="scanHint"></span>
     </div>
+    <div class="lbl">📂 Históricos guardados · abrir sin reescanear</div>
+    <div class="scanrow">
+      <select id="histSel" style="flex:1"><option value="">(cargando históricos…)</option></select>
+      <button id="histGo">📂 Abrir histórico</button>
+      <button id="histRef" title="actualizar lista">↻</button>
+    </div>
     <div class="scanbar" id="scanBarWrap" style="display:none">
       <div class="scanbar-fill" id="scanBarFill"></div>
     </div>
@@ -1524,6 +1530,19 @@ ev.addEventListener("snapshot", e => {
   $("status").className = "live";
   render();
 });
+// Objetivo nuevo (o histórico abierto): el servidor avisa que hay que
+// vaciar todo lo anterior, para que no queden resultados mezclados.
+ev.addEventListener("reset", () => {
+  state.records = [];
+  state.portOptions = new Set();
+  state.coExtra = {};
+  state.coExtraSeeded = new Set();
+  state.groupPt = {};
+  state.traceKey = "";
+  if (state.traceLayer) { state.traceLayer.clearLayers(); }
+  refreshHistories();
+  render();
+});
 ev.onmessage = e => {
   try {
     state.records.unshift(JSON.parse(e.data));
@@ -1679,6 +1698,32 @@ function showHero(show) {
   $("newScanBtn").style.display = show ? "none" : "inline-block";
 }
 let scanRunning = false;
+function refreshHistories() {
+  fetch("/histories").then(r => r.json()).then(list => {
+    const sel = $("histSel");
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">seleccioná un escaneo guardado…</option>' +
+      list.map(h => '<option value="' + esc(h.name) + '">' + esc(h.name) + " · " + fmtK(h.size) + "B · " + esc(h.at) + "</option>").join("");
+    if (cur && list.some(h => h.name === cur)) sel.value = cur;
+    else sel.value = "";
+  }).catch(() => {
+    $("histSel").innerHTML = '<option value="">históricos no disponibles</option>';
+  });
+}
+function loadHistory() {
+  const name = $("histSel").value;
+  if (!name) { alert("Elegí un escaneo guardado de la lista."); return; }
+  fetch("/history/load", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+    .then(r => r.ok ? r.json() : Promise.reject({ r }))
+    .then(j => {
+      $("scanLog").style.display = "block";
+      $("scanLog").innerHTML = '<span class="l s">📂 histórico "' + esc(j.file) + '" cargado: ' + j.records + " registros (sin reescanear)</span>";
+    })
+    .catch(err => {
+      const st = err && err.r ? err.r.status : 0;
+      alert(st === 409 ? "hay un escaneo en curso: detenelo antes de abrir un histórico" : "no se pudo abrir el histórico");
+    });
+}
 function startScan() {
   const cidr = $("scanTarget").value.trim();
   if (!cidr) { alert("Escribí un objetivo: red (192.168.1.0/24), IP o dominio."); return; }
@@ -1703,7 +1748,9 @@ function startScan() {
     .then(r => r.ok ? r.json() : Promise.reject({ r }))
     .then(j => { scanRunning = true; })
     .catch(err => {
-      $("scanLog").innerHTML += '<span class="l">❌ ' + esc((err.r && err.r.status === 409) ? "ya hay un escaneo en curso" : "no se pudo lanzar el escaneo") + "</span>";
+      let msg = (err.r && err.r.status === 409) ? "ya hay un escaneo en curso" : "no se pudo lanzar el escaneo";
+      if (err.r && err.r.status === 503) msg = "sin conexión a internet: pausado (no se pudo obtener tu IP/geo). Revisá el router y volvé a intentar";
+      $("scanLog").innerHTML += '<span class="l">❌ ' + esc(msg) + "</span>";
       $("scanStop").style.display = "none";
       $("scanGo").disabled = false;
     });
@@ -1746,15 +1793,19 @@ function pollScanStatus() {
         $("scanBarFill").style.width = "100%";
         $("scanBarTxt").textContent = "listo: " + st.open + " puertos abiertos de " + st.total + " probados";
       }
-      $("scanLog").innerHTML += '<span class="l s">✓ escaneo finalizado</span>';
+      $("scanLog").innerHTML += '<span class="l s">✓ escaneo finalizado (guardado en tus históricos)</span>';
       updateTrace(st && st.sample);
+      refreshHistories();
     }
   }).catch(() => {});
 }
 $("scanGo").addEventListener("click", startScan);
 $("scanStop").addEventListener("click", stopScan);
+$("histGo").addEventListener("click", loadHistory);
+$("histRef").addEventListener("click", refreshHistories);
 $("scanTarget").addEventListener("keydown", e => { if (e.key === "Enter") startScan(); });
 $("newScanBtn").addEventListener("click", () => showHero(true));
+refreshHistories();
 </script>
 </body>
 </html>

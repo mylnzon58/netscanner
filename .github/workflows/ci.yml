@@ -29,3 +29,20 @@ jobs:
 
       - name: Build enrich
         run: go build -o enrich.exe ./cmd/enrich
+
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Regla de oro del proyecto: el repo es solo código. Los resultados
+      # de escaneo, la caché geo, las notas y las claves viven en data/
+      # (ignorado). Si esto falla, hay datos sensibles en el repo: no
+      # se pueden subir IPs, redes, cuentas ni webs de nadie.
+      - name: No data files in repo
+        run: |
+          if git ls-files | grep -Ev '^(cmd|pkg|scripts|docs|\.github|README\.md|LICENSE|Makefile|go\.mod|go\.sum|\.gitignore)$' | grep -E '\.(jsonl|csv|stats|mmdb|log)$|geo-cache|comments\.json|ai_key|tools/|^data/'; then
+            echo "::error::Hay archivos de datos/escaneos en el repo. Se sube solo código: move los resultados a data/ (ignorado por git)."
+            exit 1
+          fi
+          echo "OK: sin datos de escaneos en el repo."

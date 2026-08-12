@@ -1,6 +1,6 @@
 # build.ps1 - compila los tres binarios en Windows.
 $ErrorActionPreference = "Stop"
-Set-Location $PSScriptRoot
+Set-Location (Split-Path $PSScriptRoot -Parent)
 
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
     $candidates = @("$env:LOCALAPPDATA\Programs\go\bin", "C:\Program Files\Go\bin", "$env:USERPROFILE\go\bin", "C:\Go\bin")

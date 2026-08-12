@@ -1,3 +1,7 @@
+# Datos locales (resultados de escaneo, caché geo, notas, logs)
+# NUNCA se suben al repo: se guardan solo en tu PC.
+data/
+
 # Binaries
 *.exe
 *.exe~
@@ -6,7 +10,7 @@ dashboard
 enrich
 .dashboard.pid
 
-# Scan results and data files
+# Scan results and data files (fuera de data/ por precaución)
 *.jsonl
 *.csv
 scan_stats.json

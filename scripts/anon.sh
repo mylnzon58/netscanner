@@ -8,7 +8,8 @@
 set -uo pipefail
 
 SocksPort=9050
-TorDir="$(cd "$(dirname "$0")" && pwd)/tools/tor"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+TorDir="$ROOT/tools/tor"
 TorExe="$TorDir/tor"
 Torrc="$TorDir/torrc"
 DataDir="$TorDir/data"
@@ -124,7 +125,7 @@ sleep 8
 if check_tor; then
   echo ""
   echo "Ejemplos:"
-  echo "  ./netscanner -c 203.0.113.0/24 -p 80,443,554 -w 20 -t 5000 -o anon.jsonl --proxy socks5://127.0.0.1:$SocksPort"
+  echo "  ./netscanner -c 203.0.113.0/24 -p 80,443,554 -w 20 -t 5000 -o data/anon.jsonl --proxy socks5://127.0.0.1:$SocksPort"
 else
   echo "ERROR: Tor no responde en el puerto $SocksPort. Revisa $LogFile" >&2
   exit 1
