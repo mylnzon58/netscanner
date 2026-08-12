@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -65,6 +66,16 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Si el archivo indicado está vacío o no existe, abrir el JSONL de
+	// resultados más reciente del directorio: el panel siempre muestra
+	// el último escaneo, aunque se reinicie.
+	if fi, err := os.Stat(*file); err != nil || fi.Size() == 0 {
+		if newest := newestJSONL(filepath.Dir(*file)); newest != "" && newest != *file {
+			fmt.Fprintf(os.Stderr, "[dashboard] %s vacío o inexistente; usando %s\n", *file, newest)
+			*file = newest
+		}
+	}
 
 	tailer, err := openTailerRetry(*file, ctx)
 	if err != nil {
@@ -150,6 +161,31 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// newestJSONL devuelve el archivo .jsonl con modificación más reciente
+// del directorio (ignorando vacíos), o "" si no hay ninguno.
+func newestJSONL(dir string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	var newest string
+	var newestAt time.Time
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
+			continue
+		}
+		fi, err := e.Info()
+		if err != nil || fi.Size() == 0 {
+			continue
+		}
+		if fi.ModTime().After(newestAt) {
+			newestAt = fi.ModTime()
+			newest = filepath.Join(dir, e.Name())
+		}
+	}
+	return newest
 }
 
 func openTailerRetry(path string, ctx context.Context) (*live.Tailer, error) {

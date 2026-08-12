@@ -40,11 +40,16 @@ netscanner.exe -c 10.0.0.0/8 -p 80,443,8080,554,21 -w 1000 -t 1500 -o out.jsonl
 netscanner.exe -c delco-digital.com -p 80,443,8080 -o web.jsonl
 ```
 
-`-c` acepta un rango CIDR, una IP suelta (`203.0.113.7`) o un dominio (se resuelve por DNS y se escanea esa IP).
+`-c` acepta un rango CIDR, una IP suelta (`203.0.113.7`), un dominio (se resuelve por DNS y se escanea esa IP) o **varios objetivos a la vez** separados por coma:
+
+```powershell
+netscanner.exe -c 192.168.1.0/24,10.0.0.1
+netscanner.exe -c "203.0.113.0/22,203.0.114.0/22" -p 80,554 -w 1000
+```
 
 | Flag | Corto | Por defecto | Descripción |
 |---|---|---|---|
-| `--cidr` | `-c` | `192.168.1.0/24` | rango IPv4, IP suelta o dominio a escanear |
+| `--cidr` | `-c` | `192.168.1.0/24` | rango IPv4, IP suelta, dominio o varios separados por coma |
 | `--ports` | `-p` | `80,443,8080,8000,554,21,22` | puertos TCP separados por coma |
 | `--ftp-ports` | | `21` | puertos que reciben el sondeo FTP anónimo |
 | `--dav` | | `true` | sondear puertos web con PROPFIND para detectar WebDAV |
@@ -56,6 +61,18 @@ netscanner.exe -c delco-digital.com -p 80,443,8080 -o web.jsonl
 | `--stats` | | | archivo de progreso en vivo para el dashboard |
 | `--proxy` | | | proxy SOCKS5 para todas las conexiones, p.ej. `socks5://127.0.0.1:9050` |
 | `--user-agent` | | UA de navegador | User-Agent HTTP de los sondeos |
+
+### Escaneo de un operador completo (ASN)
+
+Con `asn:XXXX` (o `asn:` para tu propio proveedor) el panel y la CLI resuelven los rangos IPv4 anunciados por ese sistema autónomo —vía RIPEstat de RIPE, público y sin clave— y los escanean completos. Sirve para ver qué hay expuesto en una zona (cámaras, DVR, NAS, servidores sin protección):
+
+```powershell
+netscanner.exe -c asn:AS64500 -p 80,554 -w 500 -t 600 -o operador.jsonl
+```
+
+En el panel: el botón **"Tu operador de internet completo"** hace exactamente esto con un clic. Antes de arrancar, el log muestra cuántos rangos e IPs va a recorrer (p.ej. `operador AS64500: 4 rangos (5112 IPs)`). Para bloques grandes bajá `-t` y subí `-w`; también podés probar puertos de a uno.
+
+> ⚠️ Escaneá solo tu propio operador, y usá lo que encuentres para **reportar lo expuesto**, no para atacar: lo abierto suele ser de gente de tu zona.
 
 ### Escaneo anónimo (Tor)
 
@@ -93,7 +110,7 @@ Abrís `http://127.0.0.1:8080`. El panel:
 - ofrece un **navegador en vivo** (`/proxy`) para recorrer cualquier host descubierto dentro del panel;
 - calcula un **puntaje de riesgo de exposición** por dispositivo (listados de archivos, cámaras, logins, FTP, WebDAV, puertos abiertos) con badges alto/medio/bajo;
 - incluye la **consola de laboratorio** para consultar DNS, ISP y Shodan de cualquier IP o dominio (sin escanear);
-- **escanea desde la web**: cuando no hay datos, el panel propone objetivos (tu red local, tu IP pública o un dominio) y un formulario para lanzar el escaneo con puertos, timeout, workers y proxy opcional, viendo el progreso en vivo;
+- **escanea desde la web**: cuando no hay datos, el panel propone objetivos —tu red local, **todo el bloque de tu proveedor de internet** o un dominio— y un formulario para lanzar el escaneo con puertos, timeout, workers y proxy opcional, viendo el progreso en vivo;
 - muestra **tecnologías y CDN** detectadas (jQuery, nginx, Cloudflare, WordPress, …) como etiquetas en cada ficha;
 - deja **notas por dispositivo** (por ejemplo, "es un honeypot, no tocar") guardadas en `comments.json`;
 - analiza cada dispositivo con **IA gratuita opcional** (Groq o Gemini): explica qué es, qué señales raras tiene, el riesgo y qué hacer, sin abrir nada más en el host.
@@ -146,7 +163,7 @@ cmd/enrich/     geolocalización en lote de resultados JSONL existentes
 pkg/config/     parseo y validación de flags
 pkg/engine/     generador de IPs en streaming + pool de workers + pipeline de sondeo
 pkg/banner/     sondeos HTTP/crudo/FTP/WebDAV
-pkg/geo/        MaxMind .mmdb + geolocalización online (ip-api)
+pkg/geo/        MaxMind .mmdb + geolocalización online (ip-api) + rangos por ASN (RIPEstat)
 pkg/socks/      cliente SOCKS5 mínimo (sin auth y con user/pass)
 pkg/exporter/   escritor JSONL asíncrono
 pkg/live/       hub SSE + tailer de archivo para el dashboard

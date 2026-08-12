@@ -1530,7 +1530,8 @@ function loadSuggest() {
     ).join("");
     box.querySelectorAll(".sugbtn").forEach(b => b.addEventListener("click", () => {
       $("scanTarget").value = b.dataset.v;
-      $("scanTarget").focus();
+      if (b.dataset.v) startScan();
+      else $("scanTarget").focus();
     }));
   }).catch(() => { $("suggs").innerHTML = '<div class="empty">sin propuestas (panel arranca igual)</div>'; });
 }
@@ -1551,6 +1552,9 @@ function startScan() {
   };
   $("scanLog").style.display = "block";
   $("scanLog").innerHTML = '<span class="l s">▶ lanzando escaneo de ' + esc(cidr) + "…</span>";
+  if (cidr.startsWith("asn:")) {
+    $("scanLog").innerHTML += '<span class="l m">⏳ escaneá el bloque completo de tu proveedor. Puede tardar varios minutos: apretá "Detener" cuando quieras. Usalo para ver qué expuesto hay en tu zona, no para atacar nada.</span>';
+  }
   $("scanBarWrap").style.display = "block";
   $("scanBarFill").style.width = "0%";
   $("scanBarTxt").textContent = "preparando escaneo…";

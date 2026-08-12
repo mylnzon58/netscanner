@@ -80,8 +80,10 @@ Para escanear un rango de otro operador de tu zona necesitás sus bloques de IP.
 | Tarea | Comando |
 |---|---|
 | Tu red local | `.\netscanner.exe -c 192.168.1.0/24 -o casa.jsonl` |
+| Tu operador completo | `.\netscanner.exe -c asn: -p 80,554 -w 500 -t 600 -o operador.jsonl` (o `asn:AS64500` para otro; en el panel, un clic en "Tu operador de internet completo") |
 | Una IP suelta | `.\netscanner.exe -c 203.0.113.7/32 -p 80,443,554,21 -o ip.jsonl` |
 | Un dominio | `.\netscanner.exe -c delco-digital.com -p 80,443,8080,554 -o web.jsonl` (resuelve la IP y la escanea) |
+| Varios objetivos | `.\netscanner.exe -c 192.168.1.0/24,10.0.0.1 -p 80 -o mix.jsonl` |
 | Un rango de ISP (conocido/tuyo) | `.\netscanner.exe -c 198.51.100.0/24 -p 80,443,8080,8000,554,21,22,5000,5001 -w 400 -t 1500 -o isp.jsonl --stats scan_stats.json` |
 | Anónimo por TOR | agregar `--proxy socks5://127.0.0.1:9050` (y bajar `-w` a 20-50) |
 | Ver resultados | `.\dashboard.exe -file isp.jsonl` → http://127.0.0.1:8080 |
