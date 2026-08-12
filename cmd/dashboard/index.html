@@ -43,6 +43,8 @@
   .maplayers button { background: transparent; border: 0; color: #9aa7bd; font-size: 11px; padding: 4px 9px; border-radius: 6px; cursor: pointer; }
   .maplayers button:hover { color: #e5ebf5; }
   .maplayers button.on { background: #5b7cfa; color: #0f1115; font-weight: 600; }
+  .osbadge { display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; font-size: 11px; font-weight: 500; color: #9aa7bd; background: #151a24; border: 1px solid #2a3342; border-radius: 20px; padding: 3px 10px 3px 7px; margin-left: 8px; }
+  .osbadge svg { display: block; }
   .rngrow { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .rngcard { flex: 1; min-width: 200px; background: #161a22; border: 1px solid #262d3a; border-left: 4px solid #6c7aa8; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
   .rngcard .n { font-family: Consolas, monospace; color: #e5ebf5; font-weight: 700; }
@@ -221,7 +223,7 @@
 </head>
 <body>
 <header>
-  <h1>netscanner · panel en vivo</h1>
+  <h1>netscanner · panel en vivo <span class="osbadge" id="osBadge" title="">–</span></h1>
   <span id="status">conectando…</span>
   <span class="conn" id="mConn">mi conexión: consultando…</span>
   <span class="stat">registros: <b id="cTotal">0</b></span>
@@ -1044,6 +1046,19 @@ function setTiles(name) {
   else l.options.maxZoom = 19;
   document.querySelectorAll("#maplayers button").forEach(b => b.classList.toggle("on", b.dataset.t === name));
 }
+// Logo del sistema operativo donde corre el panel (del servidor).
+const OS_LOGO = {
+  windows: '<svg viewBox="0 0 24 24" width="13" height="13"><path fill="#00a4ef" d="M0 3.45 9.75 2.3v9.3H0zM11.25 2.15 24 0v11.6H11.25zM0 12.4h9.75v9.3L0 20.55zM11.25 12.4H24V24l-12.75-1.75z"/></svg>',
+  darwin: '<svg viewBox="0 0 24 24" width="13" height="13"><path fill="#a2aaad" d="M16.4 13c-.1-2.7 2.2-4 2.3-4.1-1.2-1.8-3.1-2.1-3.8-2.1-1.6-.2-3.2 1-4 1s-2.1-1-3.4-1c-1.8 0-3.4 1-4.3 2.7-1.8 3.2-.5 7.9 1.3 10.4.9 1.3 2 2.7 3.4 2.7s1.9-.9 3.5-.9 2.1.9 3.5.9 2.3-1.3 3.2-2.6c1-1.5 1.4-3 1.4-3.1s-2.5-1-2.5-3.8zM13.9 4.6c.8-.9 1.3-2.2 1.1-3.5-1.1.1-2.4.8-3.2 1.7-.7.8-1.4 2.2-1.2 3.5 1.3.1 2.5-.7 3.3-1.7z"/></svg>',
+  linux: '<svg viewBox="0 0 24 24" width="13" height="13"><path fill="#f59e0b" d="M12 2c-1.1 0-2 .9-2 2v1.3C7.3 6.4 5.6 8.8 5.5 11.4c-1.3.6-2.2 2-2.2 3.5 0 1.2.5 2.3 1.3 3.1-.2.7-.4 1.4-.6 2.1-.3 1 .3 1.9 1.3 2.1.8.1 1.6-.4 1.9-1.1h.9c.3 0 .5-.2.5-.5v-1c.5.1 1 .1 1.5.1s1 0 1.5-.1v1c0 .3.2.5.5.5h.9c.3.7 1.1 1.2 1.9 1.1 1-.2 1.6-1.1 1.3-2.1-.2-.7-.4-1.4-.6-2.1.8-.8 1.3-1.8 1.3-3.1 0-1.5-.9-2.9-2.2-3.5-.1-2.6-1.9-5-4.5-5.9V4c0-1.1-.9-2-2-2zm-3.5 9.2c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5-1.5-.7-1.5-1.5.7-1.5 1.5-1.5zm7 0c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5-1.5-.7-1.5-1.5.7-1.5 1.5-1.5z"/></svg>'
+};
+function loadOSBadge() {
+  fetch("/os").then(r => r.json()).then(o => {
+    const el = $("osBadge");
+    el.innerHTML = (OS_LOGO[o.os] || "") + "<span>" + esc(o.name) + " · " + esc(o.arch) + "</span>";
+    el.title = "El panel corre sobre: " + o.name + " (" + o.os + "/" + o.arch + ")";
+  }).catch(() => { $("osBadge").textContent = ""; });
+}
 function buildMap() {
   const msg = $("mapMsg");
   if (!window.L) {
@@ -1527,6 +1542,7 @@ loadSuggest();
 setInterval(pollScanStatus, 1200);
 setInterval(enrichTick, 25000);
 setTimeout(enrichTick, 1500);
+loadOSBadge();
 pollScanStatus();
 
 // ---- señales de trampa / riesgo (heurística local, no abre nada) ----

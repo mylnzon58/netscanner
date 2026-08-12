@@ -1,6 +1,10 @@
 # Binaries
 *.exe
 *.exe~
+netscanner
+dashboard
+enrich
+.dashboard.pid
 
 # Scan results and data files
 *.jsonl

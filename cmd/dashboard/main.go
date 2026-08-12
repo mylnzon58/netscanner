@@ -145,6 +145,7 @@ func main() {
 	mux.HandleFunc("/shodan", handleShodan)
 	mux.HandleFunc("/iplookup", handleIPLookup)
 	mux.HandleFunc("/geo/enrich", handleGeoEnrich)
+	mux.HandleFunc("/os", handleOS)
 	mux.HandleFunc("/scan", app.handleScan)
 	mux.HandleFunc("/scanstop", app.handleScanStop)
 	mux.HandleFunc("/scanstatus", app.handleScanStatus)

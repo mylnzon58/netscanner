@@ -18,19 +18,42 @@ El motor recorre rangos CIDR en streaming, sondea puertos TCP abiertos, identifi
 ## Requisitos
 
 - Go 1.22 o más nuevo (probado con 1.26)
-- Windows (el código es multiplataforma; el instalador de Tor es PowerShell)
+- Windows, macOS (Intel o Apple Silicon) o Linux: el código es Go puro y compila igual en las tres
 - Conexión a internet si querés geolocalización online o Tor
 
-## Compilar
+## Instalar y desplegar (un solo comando)
+
+El repositorio trae scripts de despliegue automático por sistema: compilan los tres binarios, arrancan el panel y abren el navegador solo.
 
 ```powershell
-go mod tidy
-go build -ldflags="-s -w" -o netscanner.exe ./cmd/scanner
-go build -o dashboard.exe ./cmd/dashboard
-go build -o enrich.exe ./cmd/enrich
+# Windows
+.\deploy.ps1
+
+# macOS / Linux
+./deploy.sh
 ```
 
-También hay un Makefile: `make build` / `make test` / `make clean`.
+Después abrí `http://127.0.0.1:8080`. El panel muestra en el título el **logo y el nombre del sistema operativo donde corre** (Windows, macOS o Linux, detectado en el servidor). Si el binario ya está compilado y solo querés el panel:
+
+```powershell
+# Windows
+.\dashboard.exe -file casa.jsonl        # y abrís http://127.0.0.1:8080
+
+# macOS / Linux
+./dashboard -file casa.jsonl
+```
+
+Compilar a mano (si querés):
+
+```powershell
+# Windows
+.\build.ps1
+
+# macOS / Linux (o: make build && make dashboard && make enrich)
+./build.sh
+```
+
+Los binarios en Windows son `netscanner.exe` / `dashboard.exe` / `enrich.exe`; en macOS y Linux son `netscanner` / `dashboard` / `enrich` (sin extensión). El resto de comandos de este documento usa `netscanner.exe`, pero la única diferencia en macOS/Linux es la extensión.
 
 ## Uso básico
 
@@ -76,6 +99,8 @@ En el panel: el botón **"Tu operador de internet completo"** hace exactamente e
 
 ### Escaneo anónimo (Tor)
 
+Windows:
+
 ```powershell
 # una sola vez: descarga el Tor Expert Bundle oficial a tools\tor y lo inicia
 .\anon.ps1
@@ -83,6 +108,8 @@ En el panel: el botón **"Tu operador de internet completo"** hace exactamente e
 # a partir de acá todas las conexiones salen por Tor
 .\netscanner.exe -c 203.0.113.0/24 -p 80,443,554 -w 20 -t 5000 -o anon.jsonl --proxy socks5://127.0.0.1:9050
 ```
+
+macOS / Linux: lo mismo con `./anon.sh` (detecta la plataforma y baja el bundle correspondiente). Parar con `--stop`, verificar con `--check`.
 
 El dashboard puede usar el mismo proxy para el navegador en vivo y el listado FTP: `.\dashboard.exe -file anon.jsonl --proxy socks5://127.0.0.1:9050`.
 
@@ -121,6 +148,10 @@ Abrís `http://127.0.0.1:8080`. El panel:
 .\enrich.exe -in results.jsonl            # escribe results_geo.jsonl
 .\dashboard.exe -file results_geo.jsonl   # el mapa ahora muestra las ciudades
 ```
+
+### Escaneo de la red local con un clic
+
+Windows: `escanear-red.bat` (doble clic) o `.\escanear-red.bat` — detecta la red sola (`detectar-red.ps1`), la escanea con la lista completa de puertos y abre el panel con los resultados. macOS/Linux: `./escanear-red.sh` (usa `detectar-red.sh`).
 
 `scan-isp.ps1` automatiza todo el flujo (escaneo de rangos ISP → geolocalización → recarga del panel), opcionalmente por proxy: `.\scan-isp.ps1 -Proxy socks5://127.0.0.1:9050`.
 

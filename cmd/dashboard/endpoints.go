@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -373,6 +374,60 @@ func (a *app) handleScanStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// ---- sistema operativo del servidor ----
+
+// handleOS describe el sistema operativo donde corre el panel, para
+// mostrarlo con su logo en la web.
+func handleOS(w http.ResponseWriter, r *http.Request) {
+	name := osName()
+	if name == "" {
+		switch runtime.GOOS {
+		case "windows":
+			name = "Windows"
+		case "darwin":
+			name = "macOS"
+		case "linux":
+			name = "Linux"
+		default:
+			name = runtime.GOOS
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"os":   runtime.GOOS,
+		"arch": runtime.GOARCH,
+		"name": name,
+	})
+}
+
+// osName devuelve el nombre bonito del sistema operativo (Windows 11,
+// macOS 15.1, Ubuntu 24.04…); vacío si no se puede determinar.
+func osName() string {
+	switch runtime.GOOS {
+	case "windows":
+		out, err := exec.Command("reg", "query", `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "/v", "ProductName").Output()
+		if err == nil {
+			line := strings.TrimSpace(string(out))
+			if i := strings.LastIndex(line, "REG_SZ"); i >= 0 {
+				return strings.TrimSpace(line[i+len("REG_SZ"):])
+			}
+		}
+	case "darwin":
+		if out, err := exec.Command("sw_vers", "-productVersion").Output(); err == nil {
+			return "macOS " + strings.TrimSpace(string(out))
+		}
+	case "linux":
+		if d, err := os.ReadFile("/etc/os-release"); err == nil {
+			for _, l := range strings.Split(string(d), "\n") {
+				if strings.HasPrefix(l, "PRETTY_NAME=") {
+					return strings.Trim(strings.TrimPrefix(l, "PRETTY_NAME="), `"`)
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // ---- propuestas de escaneo ----
