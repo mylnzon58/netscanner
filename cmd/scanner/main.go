@@ -126,19 +126,15 @@ func main() {
 	fmt.Fprintln(os.Stderr, "[netscanner] escaneando (Ctrl+C detiene de forma prolija) ...")
 
 	var final engine.Snapshot
+	shared := &engine.Stats{}
 	for _, cidr := range cidrs {
 		opts.CIDR = cidr
-		stats, err := engine.Run(ctx, opts, db, exp.Results())
-		if err != nil {
+		if _, err := engine.Run(ctx, opts, db, exp.Results(), shared); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
-		s := stats.Snapshot()
-		final.Attempts += s.Attempts
-		final.Open += s.Open
-		final.Timeout += s.Timeout
-		final.Errored += s.Errored
 	}
+	final = shared.Snapshot()
 
 	if err := exp.Close(); err != nil {
 		fmt.Fprintln(os.Stderr, "error al descargar la salida:", err)

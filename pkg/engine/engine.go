@@ -26,12 +26,40 @@ type job struct {
 	port int
 }
 
-// Stats acumula los contadores de una corrida de escaneo.
+// Stats acumula los contadores de una corrida de escaneo. Puede
+// compartirse entre varias corridas (múltiples objetivos) para que el
+// progreso en vivo sea el global.
 type Stats struct {
 	Attempts atomic.Uint64
 	Open     atomic.Uint64
 	Timeout  atomic.Uint64
 	Errored  atomic.Uint64
+	TotalJob atomic.Uint64 // trabajos totales agregados al escanear
+
+	mu     sync.Mutex
+	sample []string // últimas IPs probadas, en orden
+}
+
+const sampleN = 48
+
+// Seen registra una dirección recién probada en la muestra de progreso.
+func (s *Stats) Seen(ip string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sample = append(s.sample, ip)
+	if n := len(s.sample) - sampleN; n > 0 {
+		s.sample = append(s.sample[:0], s.sample[n:]...)
+	}
+}
+
+// Sample devuelve la muestra actual de IPs probadas, de la más vieja a
+// la más reciente.
+func (s *Stats) Sample() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, len(s.sample))
+	copy(out, s.sample)
+	return out
 }
 
 // Snapshot es una copia simple de los contadores, segura de imprimir
@@ -108,7 +136,10 @@ func IPs(ctx context.Context, ipnet *net.IPNet) <-chan net.IP {
 // Run bloquea hasta sondear todo el rango o hasta que cancelen ctx. Al
 // cancelar, el generador deja de mandar trabajos y los dials en vuelo
 // (acotados por opts.Timeout) terminan, así el cierre es prolijo.
-func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- exporter.Result) (*Stats, error) {
+//
+// Si shared no es nil, los contadores se acumulan ahí (útil para
+// escanear varios objetivos con un solo progreso global).
+func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- exporter.Result, shared *Stats) (*Stats, error) {
 	_, ipnet, err := net.ParseCIDR(opts.CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("CIDR inválido %q: %w", opts.CIDR, err)
@@ -122,8 +153,11 @@ func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- ex
 	}
 
 	stats := &Stats{}
-
+	if shared != nil {
+		stats = shared
+	}
 	jobCount := hosts * uint64(len(opts.Ports))
+	stats.TotalJob.Add(jobCount)
 	workers := opts.Workers
 	if uint64(workers) > jobCount {
 		workers = int(jobCount)
@@ -170,6 +204,7 @@ func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- ex
 			defer wg.Done()
 			for j := range jobs {
 				stats.Attempts.Add(1)
+				stats.Seen(j.ip.String())
 				conn, err := dial(j, opts.Timeout)
 				if err != nil {
 					if isTimeout(err) {
@@ -195,18 +230,27 @@ func Run(ctx context.Context, opts *config.Options, db *geo.GeoDB, out chan<- ex
 
 // writeStats guarda el progreso en vivo de un escaneo para el panel.
 func writeStats(path string, total uint64, s *Stats) {
+	if s.TotalJob.Load() > total {
+		total = s.TotalJob.Load()
+	}
 	snap := struct {
-		Total    uint64 `json:"total"`
-		Attempts uint64 `json:"attempts"`
-		Open     uint64 `json:"open"`
-		Timeouts uint64 `json:"timeouts"`
-		Errors   uint64 `json:"errors"`
+		Total    uint64   `json:"total"`
+		Attempts uint64   `json:"attempts"`
+		Open     uint64   `json:"open"`
+		Timeouts uint64   `json:"timeouts"`
+		Errors   uint64   `json:"errors"`
+		Sample   []string `json:"sample"`
+		Last     string   `json:"last"`
 	}{
 		Total:    total,
 		Attempts: s.Attempts.Load(),
 		Open:     s.Open.Load(),
 		Timeouts: s.Timeout.Load(),
 		Errors:   s.Errored.Load(),
+		Sample:   s.Sample(),
+	}
+	if n := len(snap.Sample); n > 0 {
+		snap.Last = snap.Sample[n-1]
 	}
 	data, err := json.Marshal(snap)
 	if err != nil {

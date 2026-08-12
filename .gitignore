@@ -19,6 +19,9 @@ tools/
 comments.json
 ai_key.json
 
+# Caché de geolocalización local (IPs y ubicaciones tuyas)
+geo-cache.json
+
 # OS
 .DS_Store
 Thumbs.db

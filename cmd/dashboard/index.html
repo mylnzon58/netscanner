@@ -210,6 +210,9 @@
   #dAiOut { margin-top: 8px; background: #0d0f14; border: 1px solid #1d232f; border-radius: 8px; padding: 10px 12px; font-size: 12.5px; white-space: pre-wrap; color: #c8d2e3; display: none; }
   #dAiCfg { background: #1c212c; border: 1px solid #2c3444; color: #9aa7bd; font-size: 11.5px; }
   .muted2 { color: #5b6472; font-size: 11.5px; }
+.radarping { position: relative; width: 26px; height: 26px; border-radius: 50%; background: rgba(91,124,250,.28); border: 2px solid #8fa3ff; }
+  .radarping::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: rgba(255,122,122,.55); animation: radarping 1.1s ease-out infinite; }
+  @keyframes radarping { 0% { transform: scale(.35); opacity: 1; } 75% { transform: scale(2.4); opacity: 0; } 100% { transform: scale(2.4); opacity: 0; } }
 </style>
 </head>
 <body>
@@ -407,7 +410,7 @@
 
 <script>
 "use strict";
-const state = { records: [], portOptions: new Set(), viewer: null, map: null, myip: null };
+const state = { records: [], portOptions: new Set(), viewer: null, map: null, myip: null, coExtra: {}, coExtraSeeded: new Set(), groupPt: {}, traceKey: "", traceLayer: null, enrichTimer: 0 };
 const $ = id => document.getElementById(id);
 
 function esc(s) {
@@ -933,8 +936,87 @@ function jitterOf(ip) {
   for (let i = 0; i < ip.length; i++) { h ^= ip.charCodeAt(i); h = Math.imul(h, 16777619); }
   const ang = (h % 62832) / 10000;
   const d = ((h >>> 7) % 100) / 100;
-  const R = 0.02 + d * 0.10;
+  const R = 0.002 + d * 0.008;
   return [Math.cos(ang) * R, Math.sin(ang) * R];
+}
+function ip24(ip) {
+  const p = ip.split(".");
+  return p.length === 4 ? p[0] + "." + p[1] + "." + p[2] + ".0" : ip;
+}
+// ptOf devuelve la posición (lat, lon) conocida de una IP: coordenada
+// exacta si está geolocalizada, o el punto de su /24 si no.
+function ptOf(ip) {
+  const g = state.coExtra[ip];
+  if (g) return [g.lat, g.lon];
+  const bp = state.groupPt[ip24(ip)];
+  if (bp) return bp;
+  return null;
+}
+// updateTrace dibuja en el mapa la ruta del análisis: una línea con los
+// últimos puntos probados y un ping que marca por dónde va ahora mismo.
+function updateTrace(sample) {
+  const L = window.L;
+  const m = state.map;
+  if (!L || !m || !sample || !sample.length) return;
+  const keys = sample.map(ip24).join(",");
+  if (keys === state.traceKey) return;
+  state.traceKey = keys;
+  const pts = sample.map(ptOf).filter(Boolean);
+  if (!state.traceLayer) state.traceLayer = L.layerGroup().addTo(m);
+  state.traceLayer.clearLayers();
+  if (pts.length > 1) L.polyline(pts, { color: "#5b7cfa", weight: 2, opacity: .55, dashArray: "3 7" }).addTo(state.traceLayer);
+  pts.forEach((p, i) => {
+    const last = i === pts.length - 1;
+    L.circleMarker(p, { radius: last ? 4 : 2.5, color: last ? "#ff7a7a" : "#8fa3ff", weight: 1, fillColor: last ? "#ff5c5c" : "#3d5aff", fillOpacity: .9 }).addTo(state.traceLayer);
+  });
+  if (pts.length) {
+    L.marker(pts[pts.length - 1], {
+      icon: L.divIcon({ className: "", html: '<div class="radarping"></div>', iconSize: [26, 26], iconAnchor: [13, 13] })
+    }).addTo(state.traceLayer);
+  }
+}
+function clearTrace() {
+  state.traceKey = "";
+  if (state.traceLayer) { state.traceLayer.clearLayers(); }
+}
+// enrichTick geolocaliza en lotes (máx. 6 cada vez, con caché del panel)
+// un representante de cada /24 que aparezca en los resultados: el resto
+// de la misma /24 se posiciona alrededor con un jitter estable.
+function enrichTick() {
+  if (state.enrichBusy) return;
+  const want = [];
+  const seen = new Set();
+  for (const r of state.records) {
+    const g = r.geo || {};
+    if (g.latitude && g.longitude) continue;
+    if (state.coExtra[r.ip]) continue;
+    const base = ip24(r.ip);
+    if (seen.has(base) || state.coExtraSeeded.has(base)) continue;
+    seen.add(base);
+    want.push(r.ip);
+    if (want.length === 6) break;
+  }
+  if (!want.length) return;
+  state.enrichBusy = true;
+  state.coExtraSeeded.add(ip24(want[0]));
+  fetch("/geo/enrich?ips=" + encodeURIComponent(want.join(",")))
+    .then(r => r.json()).then(m => {
+      let changed = false;
+      for (const ip in m) {
+        const e = m[ip];
+        if (e.lat && e.lon) {
+          state.coExtra[ip] = { lat: e.lat, lon: e.lon, city: e.city || "" };
+          state.groupPt[ip24(ip)] = [e.lat, e.lon];
+          changed = true;
+        }
+        state.coExtraSeeded.add(ip24(ip));
+      }
+      if (changed) {
+        state.mapSig = "";
+        buildMap();
+      }
+    }).catch(() => { for (const ip of want) state.coExtraSeeded.delete(ip24(ip)); })
+    .finally(() => { state.enrichBusy = false; });
 }
 function buildMap() {
   const msg = $("mapMsg");
@@ -972,7 +1054,17 @@ function buildMap() {
     const g = r.geo || {};
     if (g.latitude && g.longitude && !coordOf[r.ip]) coordOf[r.ip] = { lat: g.latitude, lon: g.longitude, city: g.city || "" };
   }
-  const sig = Object.keys(coordOf).length + ":" + state.records.length;
+  for (const ip in state.coExtra) {
+    if (!coordOf[ip]) coordOf[ip] = { lat: state.coExtra[ip].lat, lon: state.coExtra[ip].lon, city: state.coExtra[ip].city, approx: true };
+  }
+  for (const r of state.records) {
+    if (coordOf[r.ip]) continue;
+    const bp = state.groupPt[ip24(r.ip)];
+    if (!bp) continue;
+    const [dj, dk] = jitterOf(r.ip);
+    coordOf[r.ip] = { lat: bp[0] + dj, lon: bp[1] + dk, city: "", approx: true };
+  }
+  const sig = Object.keys(coordOf).length + ":" + state.records.length + ":" + Object.keys(state.coExtra).length;
   if (state.mapSig === sig && state.mapLast && Date.now() - state.mapLast < 4000) return;
   state.mapSig = sig;
   state.mapLast = Date.now();
@@ -981,7 +1073,7 @@ function buildMap() {
   const ips = Object.keys(coordOf);
   if (!ips.length) {
     msg.classList.remove("hidden");
-    msg.innerHTML = "sin coordenadas en los resultados: al terminar el escaneo se geolocalizan y el mapa se completa solo.<br>Para datos viejos: <code>enrich.exe -in proveedor.jsonl</code>";
+    msg.innerHTML = "geolocalizando en vivo… en unos segundos las IPs van apareciendo en el mapa (se posicionan por su /24 real).<br>Para datos viejos: <code>enrich.exe -in proveedor.jsonl</code>";
     addMyIPLayer(state.map);
     if (state.myip && state.myip.lat && state.myip.lon) state.map.setView([state.myip.lat, state.myip.lon], 11);
     setTimeout(() => state.map.invalidateSize(), 50);
@@ -1010,7 +1102,7 @@ function buildMap() {
     let pop = "<b>" + typeIcon(type) + " " + esc(ip) + "</b><br>" +
       esc(c.city || "—") + " · " + esc(rngName) +
       "<br>" + (ports.length ? ports.map(p => portIcon(p) + " " + p).join(" ") : "") +
-      "<br><span style=\"color:#5b6472\">posición aproximada en el área de la ciudad</span><br>" +
+      "<br><span style=\"color:#5b6472\">" + (c.approx ? "posición de su zona (/24) del proveedor" : "posición aproximada en el área de la ciudad") + "</span><br>" +
       '<button class="ipbtn" data-ip="' + esc(ip) + '">📋 ficha</button>';
     if (d && d.view) pop += ' <button class="vbtn" data-ip="' + esc(ip) + '" data-port="' + d.view.port + '">👁 ver</button>';
     if (snapPort) pop += '<div class="snap"><img id="snap-' + esc(ip) + '" class="snapimg" alt="🎥 previsualización"><div class="muted">buscando snapshot…</div></div>';
@@ -1404,6 +1496,8 @@ loadMyIP();
 loadComments();
 loadSuggest();
 setInterval(pollScanStatus, 1200);
+setInterval(enrichTick, 25000);
+setTimeout(enrichTick, 1500);
 pollScanStatus();
 
 // ---- señales de trampa / riesgo (heurística local, no abre nada) ----
@@ -1598,6 +1692,7 @@ function pollScanStatus() {
       const lines = (s.log || []).filter(l => l && last !== l);
       for (const l of lines) logEl.innerHTML += '<span class="l">' + esc(l) + "</span>";
       logEl.scrollTop = logEl.scrollHeight;
+      updateTrace(st && st.sample);
     } else if (scanRunning) {
       scanRunning = false;
       $("scanStop").style.display = "none";
@@ -1607,6 +1702,7 @@ function pollScanStatus() {
         $("scanBarTxt").textContent = "listo: " + st.open + " puertos abiertos de " + st.total + " probados";
       }
       $("scanLog").innerHTML += '<span class="l s">✓ escaneo finalizado</span>';
+      updateTrace(st && st.sample);
     }
   }).catch(() => {});
 }

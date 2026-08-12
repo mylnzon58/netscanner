@@ -119,7 +119,7 @@ func TestRunFindsOpenPort(t *testing.T) {
 	}
 
 	out := make(chan exporter.Result, 8)
-	stats, err := Run(context.Background(), opts, geo.Unavailable(), out)
+	stats, err := Run(context.Background(), opts, geo.Unavailable(), out, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestRunStatsFile(t *testing.T) {
 		Timeout:   200 * time.Millisecond,
 		StatsFile: sf,
 	}
-	if _, err := Run(context.Background(), opts, geo.Unavailable(), make(chan exporter.Result, 8)); err != nil {
+	if _, err := Run(context.Background(), opts, geo.Unavailable(), make(chan exporter.Result, 8), nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(sf)
@@ -186,7 +186,7 @@ func TestRunCancellationIsGraceful(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan *Stats, 1)
 	go func() {
-		s, err := Run(ctx, opts, geo.Unavailable(), make(chan exporter.Result, 16))
+		s, err := Run(ctx, opts, geo.Unavailable(), make(chan exporter.Result, 16), nil)
 		if err != nil {
 			done <- nil
 			return

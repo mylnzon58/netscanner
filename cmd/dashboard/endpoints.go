@@ -22,8 +22,9 @@ import (
 )
 
 type app struct {
-	tailer *live.Tailer
-	hub    *live.Hub
+	tailer     *live.Tailer
+	hub        *live.Hub
+	filePrefix string // prefijo fijo para los archivos de cada escaneo
 }
 
 // statsPath devuelve dónde escribe el escáner su progreso en vivo,
@@ -46,6 +47,80 @@ func routesHosts(routes []string) uint64 {
 		total += count
 	}
 	return total
+}
+
+// ---- enriquecimiento geográfico en vivo ----
+
+// geoCache persiste en disco las coordenadas consultadas (ip-api tiene
+// un límite de ~45 p/min sin clave), para no repetir pedidos entre
+// reinicios del panel.
+var geoCache = struct {
+	mu   sync.Mutex
+	path string
+	data map[string]geo.OnlineInfo
+}{data: make(map[string]geo.OnlineInfo)}
+
+func init() {
+	if d, err := os.ReadFile("geo-cache.json"); err == nil {
+		_ = json.Unmarshal(d, &geoCache.data)
+	}
+	geoCache.path = "geo-cache.json"
+}
+
+func geoCacheSave() {
+	if len(geoCache.data) == 0 {
+		return
+	}
+	geoCache.mu.Lock()
+	defer geoCache.mu.Unlock()
+	d, err := json.Marshal(geoCache.data)
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(geoCache.path, d, 0o644)
+}
+
+// handleGeoEnrich geolocaliza un lote de IPs (GET /geo/enrich?ips=a,b,c,
+// como máximo 6 por pedido) usando la caché local y ip-api.
+func handleGeoEnrich(w http.ResponseWriter, r *http.Request) {
+	var ips []string
+	for _, s := range strings.Split(r.URL.Query().Get("ips"), ",") {
+		s = strings.TrimSpace(s)
+		if net.ParseIP(s) != nil {
+			ips = append(ips, s)
+		}
+		if len(ips) == 6 {
+			break
+		}
+	}
+	if len(ips) == 0 {
+		http.Error(w, "pedido inválido", http.StatusBadRequest)
+		return
+	}
+	out := map[string]geo.OnlineInfo{}
+	geoCache.mu.Lock()
+	var miss []string
+	for _, ip := range ips {
+		if g, ok := geoCache.data[ip]; ok && g.Lat != 0 {
+			out[ip] = g
+		} else {
+			miss = append(miss, ip)
+		}
+	}
+	if len(miss) > 0 {
+		if infos, err := geo.LookupOnline(miss); err == nil {
+			for ip, g := range infos {
+				geoCache.data[ip] = g
+				out[ip] = g
+			}
+		}
+	}
+	geoCache.mu.Unlock()
+	if len(miss) > 0 {
+		go geoCacheSave()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // ---- escaneo desde el panel ----
@@ -162,9 +237,7 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 	if req.Output == "" {
 		// Cada escaneo del panel escribe a su propio archivo con
 		// fecha y hora; los resultados anteriores nunca se borran.
-		base := a.tailer.Path()
-		ext := filepath.Ext(base)
-		req.Output = strings.TrimSuffix(base, ext) + "-" + time.Now().Format("20060102-150405") + ext
+		req.Output = a.filePrefix + "-" + time.Now().Format("20060102-150405") + ".jsonl"
 	}
 
 	if err := os.Truncate(req.Output, 0); err != nil && !os.IsNotExist(err) {

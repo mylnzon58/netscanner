@@ -67,6 +67,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Prefijo fijo (nombre del archivo base sin extensión) para los
+	// archivos de cada escaneo: casa → casa-20260101-120000.jsonl.
+	filePrefix := strings.TrimSuffix(filepath.Base(*file), filepath.Ext(*file))
+
 	// Si el archivo indicado está vacío o no existe, abrir el JSONL de
 	// resultados más reciente del directorio: el panel siempre muestra
 	// el último escaneo, aunque se reinicie.
@@ -94,7 +98,7 @@ func main() {
 
 	loadCommentsRef := loadComments()
 	loadAIConf()
-	app := &app{tailer: tailer, hub: hub}
+	app := &app{tailer: tailer, hub: hub, filePrefix: filePrefix}
 
 	go func() {
 		t := time.NewTicker(*poll)
@@ -140,6 +144,7 @@ func main() {
 	mux.HandleFunc("/lookup", handleLookup)
 	mux.HandleFunc("/shodan", handleShodan)
 	mux.HandleFunc("/iplookup", handleIPLookup)
+	mux.HandleFunc("/geo/enrich", handleGeoEnrich)
 	mux.HandleFunc("/scan", app.handleScan)
 	mux.HandleFunc("/scanstop", app.handleScanStop)
 	mux.HandleFunc("/scanstatus", app.handleScanStatus)
