@@ -24,31 +24,29 @@ import (
 
 // resolveTarget convierte un hostname (o URL) en un CIDR /32 con la
 // primera IPv4 que resuelva. Si la spec ya es un CIDR válido, no toca nada.
-func resolveTarget(opts *config.Options) error {
-	if _, _, err := net.ParseCIDR(opts.CIDR); err == nil {
-		return nil
+func resolveTarget(spec string) (string, error) {
+	spec = strings.TrimSpace(spec)
+	if _, _, err := net.ParseCIDR(spec); err == nil {
+		return spec, nil
 	}
-	host := strings.TrimSpace(opts.CIDR)
-	host = strings.TrimPrefix(host, "http://")
+	host := strings.TrimPrefix(spec, "http://")
 	host = strings.TrimPrefix(host, "https://")
 	if i := strings.IndexByte(host, '/'); i >= 0 {
 		host = host[:i]
 	}
 	if net.ParseIP(host) != nil {
-		opts.CIDR = host + "/32"
-		return nil
+		return host + "/32", nil
 	}
 	ips, err := net.LookupHost(host)
 	if err != nil {
-		return fmt.Errorf("no se pudo resolver %q: %w", opts.CIDR, err)
+		return "", fmt.Errorf("no se pudo resolver %q: %w", spec, err)
 	}
 	for _, ip := range ips {
 		if ip4 := net.ParseIP(ip).To4(); ip4 != nil {
-			opts.CIDR = ip4.String() + "/32"
-			return nil
+			return ip4.String() + "/32", nil
 		}
 	}
-	return fmt.Errorf("%q no resuelve a ninguna IPv4", opts.CIDR)
+	return "", fmt.Errorf("%q no resuelve a ninguna IPv4", spec)
 }
 
 func main() {
@@ -60,24 +58,41 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(2)
 	}
-	if err := resolveTarget(opts); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
+
+	// -c acepta varios objetivos separados por coma o espacio; cada uno
+	// puede ser una red, una IP o un dominio (se resuelve a /32).
+	var cidrs []string
+	for _, spec := range strings.FieldsFunc(opts.CIDR, func(r rune) bool { return r == ',' || r == ';' || r == ' ' }) {
+		cidr, err := resolveTarget(spec)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(2)
+		}
+		cidrs = append(cidrs, cidr)
+	}
+	if len(cidrs) == 0 {
+		fmt.Fprintln(os.Stderr, "error: falta el objetivo (-c)")
 		os.Exit(2)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	_, ipnet, _ := net.ParseCIDR(opts.CIDR)
-	if hosts, err := engine.HostCount(ipnet); err == nil {
-		if total := hosts * uint64(len(opts.Ports)); total > 1_000_000 {
-			fmt.Fprintf(os.Stderr, "[aviso] %s sondeará cerca de %d pares (ip,puerto)\n", opts.CIDR, total)
+	var totalJobs uint64
+	for _, cidr := range cidrs {
+		if _, ipnet, err := net.ParseCIDR(cidr); err == nil {
+			if hosts, err := engine.HostCount(ipnet); err == nil {
+				totalJobs += hosts * uint64(len(opts.Ports))
+			}
 		}
+	}
+	if totalJobs > 1_000_000 {
+		fmt.Fprintf(os.Stderr, "[aviso] se sondearán cerca de %d pares (ip,puerto)\n", totalJobs)
 	}
 
 	start := time.Now()
-	fmt.Fprintf(os.Stderr, "[netscanner] cidr=%s ports=%v workers=%d timeout=%s\n",
-		opts.CIDR, opts.Ports, opts.Workers, opts.Timeout)
+	fmt.Fprintf(os.Stderr, "[netscanner] objetivos=%d cidrs=%s ports=%v workers=%d timeout=%s\n",
+		len(cidrs), strings.Join(cidrs, ","), opts.Ports, opts.Workers, opts.Timeout)
 
 	if opts.Proxy != "" {
 		proxy, err := socks.NewDialer(opts.Proxy, opts.Timeout)
@@ -110,10 +125,19 @@ func main() {
 
 	fmt.Fprintln(os.Stderr, "[netscanner] escaneando (Ctrl+C detiene de forma prolija) ...")
 
-	stats, err := engine.Run(ctx, opts, db, exp.Results())
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
+	var final engine.Snapshot
+	for _, cidr := range cidrs {
+		opts.CIDR = cidr
+		stats, err := engine.Run(ctx, opts, db, exp.Results())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		s := stats.Snapshot()
+		final.Attempts += s.Attempts
+		final.Open += s.Open
+		final.Timeout += s.Timeout
+		final.Errored += s.Errored
 	}
 
 	if err := exp.Close(); err != nil {
@@ -121,7 +145,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	s := stats.Snapshot()
-	fmt.Fprintf(os.Stderr, "\n[listo] intentos=%d abiertos=%d timeouts=%d errores=%d duración=%s salida=%s\n",
-		s.Attempts, s.Open, s.Timeout, s.Errored, time.Since(start).Round(time.Millisecond), opts.Output)
+	fmt.Fprintf(os.Stderr, "\n[listo] objetivos=%d intentos=%d abiertos=%d timeouts=%d errores=%d duración=%s salida=%s\n",
+		len(cidrs), final.Attempts, final.Open, final.Timeout, final.Errored, time.Since(start).Round(time.Millisecond), opts.Output)
 }

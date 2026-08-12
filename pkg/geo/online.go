@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -110,6 +111,94 @@ func LookupMyIP() (OnlineInfo, error) {
 		return OnlineInfo{}, err
 	}
 	return g, nil
+}
+
+// ASNRoutes devuelve los prefijos IPv4 anunciados por un sistema
+// autónomo (p.ej. "AS64500"). Se consulta RIPEstat (RIPE), público y
+// sin clave; si no responde, se intenta BGPView. Sirve para escanear
+// todo el bloque de un proveedor de internet.
+func ASNRoutes(asn string) ([]string, error) {
+	asn = strings.TrimSpace(asn)
+	if asn == "" {
+		return nil, fmt.Errorf("ASN vacío")
+	}
+	client := &http.Client{Timeout: onlineTimeout}
+	if v4, err := asnRoutesRIPEstat(client, asn); err == nil {
+		return v4, nil
+	}
+	return asnRoutesBGPView(client, asn)
+}
+
+func asnRoutesRIPEstat(client *http.Client, asn string) ([]string, error) {
+	url := "https://stat.ripe.net/data/announced-prefixes/data.json?resource=" + asn
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data struct {
+			Prefixes []struct {
+				Prefix string `json:"prefix"`
+			} `json:"prefixes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	var v4 []string
+	for _, p := range out.Data.Prefixes {
+		if _, ipnet, err := net.ParseCIDR(p.Prefix); err == nil && ipnet.IP.To4() != nil {
+			v4 = append(v4, ipnet.String())
+			if len(v4) >= 128 {
+				break
+			}
+		}
+	}
+	if len(v4) == 0 {
+		return nil, fmt.Errorf("%s no anuncia rangos IPv4 (RIPEstat)", asn)
+	}
+	return v4, nil
+}
+
+func asnRoutesBGPView(client *http.Client, asn string) ([]string, error) {
+	url := "https://api.bgpview.io/asn/" + strings.TrimPrefix(asn, "AS") + "/prefixes"
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Data struct {
+			IPv4Prefixes []struct {
+				Prefix string `json:"prefix"`
+			} `json:"ipv4_prefixes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	var v4 []string
+	for _, p := range out.Data.IPv4Prefixes {
+		if _, ipnet, err := net.ParseCIDR(p.Prefix); err == nil && ipnet.IP.To4() != nil {
+			v4 = append(v4, ipnet.String())
+			if len(v4) >= 128 {
+				break
+			}
+		}
+	}
+	if len(v4) == 0 {
+		return nil, fmt.Errorf("%s no anuncia rangos IPv4 (BGPView)", asn)
+	}
+	return v4, nil
 }
 
 func postBatch(client *http.Client, part []map[string]string) ([]OnlineInfo, error) {

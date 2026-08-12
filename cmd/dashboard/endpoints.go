@@ -30,6 +30,24 @@ type app struct {
 // al lado del archivo que vigila el panel.
 func (a *app) statsPath() string { return a.tailer.Path() + ".stats" }
 
+// routesHosts suma las direcciones usables de una lista de rangos.
+func routesHosts(routes []string) uint64 {
+	var total uint64
+	for _, r := range routes {
+		_, ipnet, err := net.ParseCIDR(r)
+		if err != nil {
+			continue
+		}
+		ones, bits := ipnet.Mask.Size()
+		count := uint64(1) << (32 - ones)
+		if bits == 32 && ones <= 30 {
+			count -= 2
+		}
+		total += count
+	}
+	return total
+}
+
 // ---- escaneo desde el panel ----
 
 var scanState struct {
@@ -101,18 +119,34 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "falta el objetivo (CIDR, IP o dominio)", http.StatusBadRequest)
 		return
 	}
-	// Se valida el objetivo ANTES de tocar los resultados: un CIDR
-	// mal escrito no debe borrar lo que ya había escaneado.
-	if parsed, _, err := net.ParseCIDR(req.Cidr); err != nil || parsed == nil {
-		parts := strings.Split(req.Cidr, "/")
-		if len(parts) > 1 {
-			http.Error(w, "el objetivo no es un CIDR válido (ej: 192.168.1.0/24, o un dominio)", http.StatusBadRequest)
+	target := req.Cidr
+	// "asn:XXXX" escanea todos los rangos que anuncia ese proveedor
+	// (si viene solo "asn:", se usa el ASN de la propia conexión).
+	if strings.HasPrefix(req.Cidr, "asn:") {
+		asn := strings.TrimPrefix(req.Cidr, "asn:")
+		if asn == "" {
+			if info, err := geo.LookupMyIP(); err == nil && info.AS != "" {
+				asn = strings.Fields(info.AS)[0]
+			}
+		}
+		routes, err := geo.ASNRoutes(asn)
+		if err != nil {
+			http.Error(w, "no se pudieron obtener los rangos del operador: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		if net.ParseIP(parts[0]) == nil {
-			if _, err := net.LookupHost(parts[0]); err != nil {
-				http.Error(w, "no se pudo resolver el objetivo: "+req.Cidr, http.StatusBadRequest)
-				return
+		target = strings.Join(routes, ",")
+		a.scanLog(fmt.Sprintf("[netscanner] operador %s: %d rangos (%d IPs)", asn, len(routes), routesHosts(routes)))
+	}
+	// Se valida el objetivo ANTES de tocar los resultados: un CIDR
+	// mal escrito no debe borrar lo que ya había escaneado.
+	for _, part := range strings.Split(target, ",") {
+		part = strings.TrimSpace(part)
+		if _, _, err := net.ParseCIDR(part); err != nil {
+			if net.ParseIP(part) == nil {
+				if _, err := net.LookupHost(part); err != nil {
+					http.Error(w, "no se pudo resolver el objetivo: "+part, http.StatusBadRequest)
+					return
+				}
 			}
 		}
 	}
@@ -147,7 +181,7 @@ func (a *app) handleScan(w http.ResponseWriter, r *http.Request) {
 	scanState.mu.Unlock()
 
 	args := []string{
-		"-c", req.Cidr,
+		"-c", target,
 		"-p", req.Ports,
 		"-w", fmt.Sprint(req.Workers),
 		"-t", fmt.Sprint(req.Timeout),
@@ -307,11 +341,12 @@ func (a *app) handleSuggest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if info, err := geo.LookupMyIP(); err == nil && info.Query != "" {
+	if info, err := geo.LookupMyIP(); err == nil && info.AS != "" {
+		asn := strings.Fields(info.AS)[0]
 		out = append(out, item{
-			Label: "Tu IP pública " + info.Query,
-			Value: info.Query + "/32",
-			Hint:  "qué puertos tenés abiertos hacia internet (suele estar vacío)",
+			Label: "Tu operador de internet completo (" + info.ISP + ")",
+			Value: "asn:" + asn,
+			Hint:  "todo el bloque de IPs de tu proveedor: cámaras, DVR, servidores y cosas expuestas de la zona",
 		})
 	}
 
