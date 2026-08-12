@@ -67,7 +67,7 @@ netscanner.exe -c delco-digital.com -p 80,443,8080 -o web.jsonl
 
 ```powershell
 netscanner.exe -c 192.168.1.0/24,10.0.0.1
-netscanner.exe -c "203.0.113.0/22,203.0.114.0/22" -p 80,554 -w 1000
+netscanner.exe -c "198.51.100.0/24,203.0.114.7" -p 80,554 -w 1000
 ```
 
 | Flag | Corto | Por defecto | Descripción |
