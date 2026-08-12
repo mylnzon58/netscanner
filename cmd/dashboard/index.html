@@ -39,6 +39,10 @@
   #mapMsg { position: absolute; left: 16px; right: 16px; top: 0; bottom: 56px; display: flex; align-items: center; justify-content: center; text-align: center; color: #8a94a8; font-size: 12.5px; pointer-events: none; z-index: 3; }
   #mapMsg code { color: #9db6ff; }
   #mapMsg.hidden { display: none; }
+  .maplayers { position: absolute; top: 44px; right: 10px; z-index: 800; display: flex; gap: 4px; background: rgba(15,17,21,.82); border: 1px solid #2a3342; border-radius: 8px; padding: 4px; backdrop-filter: blur(4px); }
+  .maplayers button { background: transparent; border: 0; color: #9aa7bd; font-size: 11px; padding: 4px 9px; border-radius: 6px; cursor: pointer; }
+  .maplayers button:hover { color: #e5ebf5; }
+  .maplayers button.on { background: #5b7cfa; color: #0f1115; font-weight: 600; }
   .rngrow { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .rngcard { flex: 1; min-width: 200px; background: #161a22; border: 1px solid #262d3a; border-left: 4px solid #6c7aa8; border-radius: 6px; padding: 8px 12px; font-size: 12px; }
   .rngcard .n { font-family: Consolas, monospace; color: #e5ebf5; font-weight: 700; }
@@ -337,6 +341,7 @@
   </div>
   <div id="map"></div>
   <div id="mapMsg">cargando mapa…</div>
+  <div class="maplayers" id="maplayers"></div>
   <div class="rngrow" id="rngCards"></div>
 </div>
 <details class="panel">
@@ -410,7 +415,7 @@
 
 <script>
 "use strict";
-const state = { records: [], portOptions: new Set(), viewer: null, map: null, myip: null, coExtra: {}, coExtraSeeded: new Set(), groupPt: {}, traceKey: "", traceLayer: null, enrichTimer: 0 };
+const state = { records: [], portOptions: new Set(), viewer: null, map: null, myip: null, coExtra: {}, coExtraSeeded: new Set(), groupPt: {}, traceKey: "", traceLayer: null, enrichTimer: 0, tileLayer: null, tilesPref: "voyager", fallbackTiles: false };
 const $ = id => document.getElementById(id);
 
 function esc(s) {
@@ -1018,6 +1023,27 @@ function enrichTick() {
     }).catch(() => { for (const ip of want) state.coExtraSeeded.delete(ip24(ip)); })
     .finally(() => { state.enrichBusy = false; });
 }
+const TILES = {
+  voyager: { name: "Voyager", url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' },
+  light: { name: "Claro", url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' },
+  dark: { name: "Oscuro", url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' },
+  sat: { name: "Satélite", url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", attr: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics', maxZoom: 18 },
+  osm: { name: "Calles", url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }
+};
+// setTiles cambia el estilo del mapa (todos gratuitos, con atribución).
+function setTiles(name) {
+  if (!TILES[name]) return;
+  state.tilesPref = name;
+  try { localStorage.setItem("netscanner_map_layer", name); } catch (e) { }
+  const c = TILES[name];
+  const l = state.tileLayer;
+  if (!l) return;
+  l.setUrl(c.url);
+  l.setAttribution(c.attr);
+  if (c.maxZoom) l.options.maxZoom = c.maxZoom;
+  else l.options.maxZoom = 19;
+  document.querySelectorAll("#maplayers button").forEach(b => b.classList.toggle("on", b.dataset.t === name));
+}
 function buildMap() {
   const msg = $("mapMsg");
   if (!window.L) {
@@ -1027,17 +1053,20 @@ function buildMap() {
   }
   if (!state.map) {
     state.map = L.map("map").setView([-31.85, -59.02], 9);
-    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19
-    });
-    osm.on("tileerror", () => {
-      if (state.fallbackTiles) return;
+    let pref = "voyager";
+    try { const saved = localStorage.getItem("netscanner_map_layer"); if (TILES[saved]) pref = saved; } catch (e) { }
+    const first = TILES[pref];
+    state.tileLayer = L.tileLayer(first.url, { attribution: first.attr, maxZoom: first.maxZoom || 19 });
+    state.tileLayer.on("tileerror", () => {
+      if (state.fallbackTiles || state.tilesPref === "osm") return;
       state.fallbackTiles = true;
-      osm.setUrl("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png");
-      osm.setAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>');
+      setTiles("osm");
     });
-    osm.addTo(state.map);
+    state.tileLayer.addTo(state.map);
+    $("maplayers").innerHTML = Object.keys(TILES).map(k =>
+      '<button data-t="' + k + '" class="' + (k === pref ? "on" : "") + '">' + TILES[k].name + "</button>"
+    ).join("");
+    $("maplayers").querySelectorAll("button").forEach(b => b.addEventListener("click", () => setTiles(b.dataset.t)));
     state.clusters = L.markerClusterGroup({
       showCoverageOnHover: false,
       maxClusterRadius: 50,
