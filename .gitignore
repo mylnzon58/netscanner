@@ -2,13 +2,13 @@
 # NUNCA se suben al repo: se guardan solo en tu PC.
 data/
 
-# Binaries
+# Binaries (anclados a la raíz: /dashboard es el binario, no cmd/dashboard)
 *.exe
 *.exe~
-netscanner
-dashboard
-enrich
-.dashboard.pid
+/netscanner
+/dashboard
+/enrich
+/.dashboard.pid
 
 # Scan results and data files (fuera de data/ por precaución)
 *.jsonl
