@@ -949,8 +949,16 @@ function jitterOf(ip) {
   for (let i = 0; i < ip.length; i++) { h ^= ip.charCodeAt(i); h = Math.imul(h, 16777619); }
   const ang = (h % 62832) / 10000;
   const d = ((h >>> 7) % 100) / 100;
-  const R = 0.002 + d * 0.008;
+  // desplazamiento pequeño y estable por IP: ~90–350 m, para separar
+  // puntos del mismo rango sin alejarlos de su lugar real.
+  const R = 0.0008 + d * 0.0024;
   return [Math.cos(ang) * R, Math.sin(ang) * R];
+}
+function isPrivateIP(ip) {
+  const p = (ip || "").split(".");
+  if (p.length !== 4) return true;
+  const a = +p[0], b = +p[1];
+  return a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
 function ip24(ip) {
   const p = ip.split(".");
@@ -992,26 +1000,30 @@ function clearTrace() {
   state.traceKey = "";
   if (state.traceLayer) { state.traceLayer.clearLayers(); }
 }
-// enrichTick geolocaliza en lotes (máx. 6 cada vez, con caché del panel)
-// un representante de cada /24 que aparezca en los resultados: el resto
-// de la misma /24 se posiciona alrededor con un jitter estable.
+// enrichTick geolocaliza en lotes (máx. 12 cada vez, con caché del panel
+// y de ip-api) un representante de cada /24 que aparezca en los
+// resultados: el resto de la misma /24 se posiciona alrededor con un
+// jitter estable. Se consultan también las IPs que ya traen coordenadas
+// de la base MaxMind del escaneo: ip-api suele ser más precisa para
+// rangos residenciales, y la geo online siempre gana.
 function enrichTick() {
   if (state.enrichBusy) return;
   const want = [];
   const seen = new Set();
   for (const r of state.records) {
-    const g = r.geo || {};
-    if (g.latitude && g.longitude) continue;
-    if (state.coExtra[r.ip]) continue;
     const base = ip24(r.ip);
-    if (seen.has(base) || state.coExtraSeeded.has(base)) continue;
+    if (state.coExtra[r.ip] || state.coExtraSeeded.has(base)) continue;
+    if (isPrivateIP(r.ip)) {
+      state.coExtraSeeded.add(base);
+      continue;
+    }
+    if (seen.has(base)) continue;
     seen.add(base);
     want.push(r.ip);
-    if (want.length === 6) break;
+    if (want.length === 12) break;
   }
   if (!want.length) return;
-  state.enrichBusy = true;
-  state.coExtraSeeded.add(ip24(want[0]));
+  for (const ip of want) state.coExtraSeeded.add(ip24(ip));
   fetch("/geo/enrich?ips=" + encodeURIComponent(want.join(",")))
     .then(r => r.json()).then(m => {
       let changed = false;
@@ -1022,7 +1034,6 @@ function enrichTick() {
           state.groupPt[ip24(ip)] = [e.lat, e.lon];
           changed = true;
         }
-        state.coExtraSeeded.add(ip24(ip));
       }
       if (changed) {
         state.mapSig = "";
@@ -1100,12 +1111,14 @@ function buildMap() {
     state.map.addLayer(state.clusters);
   }
   const coordOf = {};
+  // La geo online (ip-api, por IP) tiene mejor precisión que la base
+  // MaxMind del escaneo (a nivel ciudad): gana siempre que exista.
+  for (const ip in state.coExtra) {
+    if (!coordOf[ip]) coordOf[ip] = { lat: state.coExtra[ip].lat, lon: state.coExtra[ip].lon, city: state.coExtra[ip].city, approx: true };
+  }
   for (const r of state.records) {
     const g = r.geo || {};
     if (g.latitude && g.longitude && !coordOf[r.ip]) coordOf[r.ip] = { lat: g.latitude, lon: g.longitude, city: g.city || "" };
-  }
-  for (const ip in state.coExtra) {
-    if (!coordOf[ip]) coordOf[ip] = { lat: state.coExtra[ip].lat, lon: state.coExtra[ip].lon, city: state.coExtra[ip].city, approx: true };
   }
   for (const r of state.records) {
     if (coordOf[r.ip]) continue;
@@ -1559,8 +1572,8 @@ loadMyIP();
 loadComments();
 loadSuggest();
 setInterval(pollScanStatus, 1200);
-setInterval(enrichTick, 25000);
-setTimeout(enrichTick, 1500);
+setInterval(enrichTick, 10000);
+setTimeout(enrichTick, 1200);
 loadOSBadge();
 pollScanStatus();
 
