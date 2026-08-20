@@ -210,7 +210,13 @@ pkg/exporter/   escritor JSONL asíncrono
 pkg/live/       hub SSE + tailer de archivo para el dashboard
 ```
 
-La especificación técnica completa está en `docs/SPEC.md`.
+## Documentación
+
+| Documento | Para qué sirve |
+|-----------|----------------|
+| [`docs/GUIA.md`](docs/GUIA.md) | Guía de uso paso a paso (modo anónimo, cámaras, laboratorio). |
+| [`docs/SPEC.md`](docs/SPEC.md) | Especificación técnica del formato y módulos base. |
+| [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Arquitectura completa del código, de extremo a extremo. **Empezá por acá si querés entender cómo funciona todo.** |
 
 ## Autor
 
