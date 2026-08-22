@@ -368,8 +368,11 @@ tras enriquecimiento online).
 
 - Mapa Leaflet + `markerCluster`. `jitterOf` (desplazamiento ~90–350 m
   determinista por IP) separa puntos del mismo `/24`.
-- `enrichTick` (cada 10 s, 12 IPs/lote): consulta `/geo/enrich` para mejorar
-  precisión (ip-api gana sobre MaxMind) y lo cachea.
+- `enrichTick` (cada 10 s, 100 IPs/lote = 1 pedido ip-api): consulta
+  **cada IP pública de forma individual** (no un representante por /24) para
+  usar la coordenada real de ip-api, que gana sobre MaxMind. Lo cachea en
+  `geo-cache.json`. El jitter es mínimo (~40–130 m) y solo separa puntos con
+  la misma coordenada exacta.
 - `buildMap` prioriza `coExtra` (geo online) sobre las coords del escaneo.
 - Eventos SSE: al recibir `reset`, el cliente limpia `records`, `coExtra`,
   `groupPt` y refresca el selector de históricos.

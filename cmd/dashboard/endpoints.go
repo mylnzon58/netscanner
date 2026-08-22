@@ -93,7 +93,7 @@ func handleGeoEnrich(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[s] = true
 		ips = append(ips, s)
-		if len(ips) == 50 {
+		if len(ips) == 100 {
 			break
 		}
 	}

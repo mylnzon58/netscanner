@@ -949,9 +949,10 @@ function jitterOf(ip) {
   for (let i = 0; i < ip.length; i++) { h ^= ip.charCodeAt(i); h = Math.imul(h, 16777619); }
   const ang = (h % 62832) / 10000;
   const d = ((h >>> 7) % 100) / 100;
-  // desplazamiento pequeño y estable por IP: ~90–350 m, para separar
-  // puntos del mismo rango sin alejarlos de su lugar real.
-  const R = 0.0008 + d * 0.0024;
+  // jitter mínimo y estable por IP: ~40–130 m, solo para que puntos con
+  // la misma coordenada exacta no queden superpuestos e ilegibles. La
+  // posición base ya es la coordenada real de ip-api (ciudad/barrio).
+  const R = 0.0004 + d * 0.001;
   return [Math.cos(ang) * R, Math.sin(ang) * R];
 }
 function isPrivateIP(ip) {
@@ -1000,30 +1001,27 @@ function clearTrace() {
   state.traceKey = "";
   if (state.traceLayer) { state.traceLayer.clearLayers(); }
 }
-// enrichTick geolocaliza en lotes (máx. 12 cada vez, con caché del panel
-// y de ip-api) un representante de cada /24 que aparezca en los
-// resultados: el resto de la misma /24 se posiciona alrededor con un
-// jitter estable. Se consultan también las IPs que ya traen coordenadas
-// de la base MaxMind del escaneo: ip-api suele ser más precisa para
-// rangos residenciales, y la geo online siempre gana.
+// enrichTick geolocaliza CADA IP pública de forma individual (no un solo
+// representante por /24): ip-api devuelve la coordenada real de cada IP,
+// que es la fuente gratuita más precisa y suele acercarse a cientos de
+// metros en residencial. Así el mapa refleja la ubicación real de cada
+// dispositivo en vez de colapsar todo un bloque en un punto. El jitter que
+// queda es mínimo (decenas de metros) y solo separa puntos con la misma
+// coordenada exacta para que sigan siendo clickeables.
 function enrichTick() {
   if (state.enrichBusy) return;
   const want = [];
-  const seen = new Set();
   for (const r of state.records) {
-    const base = ip24(r.ip);
-    if (state.coExtra[r.ip] || state.coExtraSeeded.has(base)) continue;
+    if (state.coExtra[r.ip] || state.coExtraSeeded.has(r.ip)) continue;
     if (isPrivateIP(r.ip)) {
-      state.coExtraSeeded.add(base);
+      state.coExtraSeeded.add(r.ip);
       continue;
     }
-    if (seen.has(base)) continue;
-    seen.add(base);
     want.push(r.ip);
-    if (want.length === 12) break;
+    if (want.length === 100) break;   // 1 pedido batch ip-api (≤100)
   }
   if (!want.length) return;
-  for (const ip of want) state.coExtraSeeded.add(ip24(ip));
+  for (const ip of want) state.coExtraSeeded.add(ip);
   fetch("/geo/enrich?ips=" + encodeURIComponent(want.join(",")))
     .then(r => r.json()).then(m => {
       let changed = false;
@@ -1039,7 +1037,7 @@ function enrichTick() {
         state.mapSig = "";
         buildMap();
       }
-    }).catch(() => { for (const ip of want) state.coExtraSeeded.delete(ip24(ip)); })
+    }).catch(() => { for (const ip of want) state.coExtraSeeded.delete(ip); })
     .finally(() => { state.enrichBusy = false; });
 }
 const TILES = {
