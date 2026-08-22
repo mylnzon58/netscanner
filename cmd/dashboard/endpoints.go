@@ -75,9 +75,10 @@ func geoCacheSave() {
 }
 
 // handleGeoEnrich geolocaliza un lote de IPs (GET /geo/enrich?ips=a,b,c,
-// como máximo 50 por pedido) usando la caché local y ip-api. Las IPs
-// privadas (LAN, loopback, link-local) se descartan: ip-api no las
-// geolocaliza y no vale la pena consultarlas.
+// como máximo 100 por pedido = 1 llamada al endpoint batch de ip-api)
+// usando la caché local y ip-api. Las IPs privadas (LAN, loopback,
+// link-local) se descartan: ip-api no las geolocaliza y no vale la pena
+// consultarlas.
 func handleGeoEnrich(w http.ResponseWriter, r *http.Request) {
 	var ips []string
 	seen := map[string]bool{}

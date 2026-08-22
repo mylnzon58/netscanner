@@ -250,9 +250,12 @@ Tres fuentes, jerarquía clara:
      memoria (`sync.Once`).
 
 **Precisión honesta:** tanto `.mmdb` como ip-api son a **nivel de ciudad**. El
-panel prioriza ip-api cuando la tiene (es más precisa para residencial); el
-jitter de los marcadores es de ~90–350 m (solo para separar puntos del mismo
-`/24`). Nunca es dirección de calle.
+panel enriquece **cada IP de forma individual** con ip-api (no un representante
+por `/24`) y usa esa coordenada real como base; el jitter es mínimo (~40–130 m)
+y solo separa puntos con la misma coordenada exacta para que sigan siendo
+clickeables. Nunca es dirección de calle: si varias IPs de un mismo bloque
+reportan la misma ciudad en el registro, se verán juntas porque **esa es la
+información real** del operador, no un error del escáner.
 
 ---
 
@@ -366,8 +369,10 @@ tras enriquecimiento online).
 
 ### 9.4 `index.html` (frontend)
 
-- Mapa Leaflet + `markerCluster`. `jitterOf` (desplazamiento ~90–350 m
-  determinista por IP) separa puntos del mismo `/24`.
+- Mapa Leaflet + `markerCluster`. `jitterOf` aplica un desplazamiento mínimo
+  y determinista por IP (~40–130 m) solo para que puntos con la misma
+  coordenada exacta no queden superpuestos e ilegibles; la base es la
+  coordenada real de ip-api.
 - `enrichTick` (cada 10 s, 100 IPs/lote = 1 pedido ip-api): consulta
   **cada IP pública de forma individual** (no un representante por /24) para
   usar la coordenada real de ip-api, que gana sobre MaxMind. Lo cachea en
